@@ -10,7 +10,8 @@ dependencies = [
     "scipy",
     "matplotlib",
     "mpmath",
-    "opencv-python"
+    "opencv-python",
+    "tqdm"
 ]
 
 [tool.setuptools]
