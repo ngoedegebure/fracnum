@@ -3,6 +3,12 @@ import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
 
+from scipy.fft import fft, fftfreq
+from scipy.signal.windows import blackman
+
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+
 from matplotlib.collections import LineCollection
 
 # https://matplotlib.org/stable/gallery/lines_bars_and_markers/multicolored_line.html
@@ -47,6 +53,10 @@ def colored_line(x, y, c, ax, cmap_trunc = [0,1], **lc_kwargs):
     x_midpts = np.hstack((x[0], 0.5 * (x[1:] + x[:-1]), x[-1]))
     y_midpts = np.hstack((y[0], 0.5 * (y[1:] + y[:-1]), y[-1]))
 
+    coord_start = np.column_stack((x_midpts[:-1], y_midpts[:-1]))[:, np.newaxis, :]
+    coord_mid = np.column_stack((x, y))[:, np.newaxis, :]
+    coord_end = np.column_stack((x_midpts[1:], y_midpts[1:]))[:, np.newaxis, :]
+    segments = np.concatenate((coord_start, coord_mid, coord_end), axis=1)
     # Determine the start, middle, and end coordinate pair of each line segment.
     # Use the reshape to add an extra dimension so each pair of points is in its
     # own list. Then concatenate them to create:
@@ -55,10 +65,7 @@ def colored_line(x, y, c, ax, cmap_trunc = [0,1], **lc_kwargs):
     #   [(x2_start, y2_start), (x2_mid, y2_mid), (x2_end, y2_end)],
     #   ...
     # ]
-    coord_start = np.column_stack((x_midpts[:-1], y_midpts[:-1]))[:, np.newaxis, :]
-    coord_mid = np.column_stack((x, y))[:, np.newaxis, :]
-    coord_end = np.column_stack((x_midpts[1:], y_midpts[1:]))[:, np.newaxis, :]
-    segments = np.concatenate((coord_start, coord_mid, coord_end), axis=1)
+    
 
     lc = LineCollection(segments, **default_kwargs)
     lc.set_array(c)  # set the colors of each segment
@@ -78,7 +85,7 @@ def truncate_colormap(cmap, minval=0.2, maxval=0.8, n=100):
     return new_cmap
 
 class VdP_Plotter():
-    def __init__(self, x, xder, t, params, alpha, dt, T, n_eval, comp_time, forcing_params = None):
+    def __init__(self, x, xder, t, params, alpha, dt, T, n_eval, comp_time, forcing_params = None, cmap_name="magma_r", cmap_trunc = [0.15, 0.75]):
         self.x = x
         self.xder = xder
         self.t = t
@@ -89,6 +96,11 @@ class VdP_Plotter():
         self.n_eval = n_eval 
         self.comp_time = comp_time
         self.forcing_params = forcing_params
+
+        self.cmap_name = cmap_name
+        self.cmap_trunc = cmap_trunc
+
+        self.hd_size = (16/2, 9/2)
 
         self.title, self.param_desciption = self.generate_captions()
 
@@ -101,7 +113,7 @@ class VdP_Plotter():
         if self.forcing_params is not None:
             if self.forcing_params['A'] != 0:
                 forcing_string = 'forced '
-                forcing_settings_string = r", A="+str(self.forcing_params['A'])+r", \omega="+str(np.round(self.forcing_params['omega'],2))
+                forcing_settings_string = r", A="+str(self.forcing_params['A'])+r", \omega="+str(np.round(self.forcing_params['omega'],4))
 
         if self.alpha == 1:
             fractional_settings_string = ""
@@ -115,13 +127,25 @@ class VdP_Plotter():
 
         return title, subtitle
 
-    def phase(self, show = False, save_filepath=None):
-        fig_phase, ax_phase = plt.subplots()
+    def phase(self, save_filepath=None, hd_aspect = False, empty=False):
+        if hd_aspect:
+            fig_phase, ax_phase = plt.subplots(figsize = self.hd_size)
+        else:
+            fig_phase, ax_phase = plt.subplots()
 
-        lines = colored_line(self.x, self.xder, self.t, ax_phase,cmap_trunc = [0.15, 0.75], cmap='magma_r', label=f"Bernstein Splines ({self.comp_time:.4f} s)", linewidth=2)
-        fig_phase.colorbar(lines, label=r'$t$')
+        lines = colored_line(self.x, self.xder, self.t, ax_phase,cmap_trunc = self.cmap_trunc, cmap=self.cmap_name, label=f"Bernstein Splines ({self.comp_time:.4f} s)", linewidth=2)
 
-        margin_pct = 0.1    
+        if not empty:
+            margin_pct = 0.1    
+
+            ax_phase.set(xlabel = r"$x$", ylabel =r"$\dot{x}$")
+
+            plt.suptitle("Phase portrait " + self.title)
+            plt.title(self.param_desciption)
+            fig_phase.colorbar(lines, label=r'$t$')
+        else:
+            margin_pct = 0.01
+            ax_phase.set_axis_off()
 
         x_dist = max(self.x) - min(self.x)
         margin_x = margin_pct * x_dist
@@ -131,19 +155,14 @@ class VdP_Plotter():
         margin_y = margin_pct * y_dist
         ax_phase.set_ylim(min(self.xder)-margin_y, max(self.xder)+margin_y)
 
-        ax_phase.set(xlabel = r"$x$", ylabel =r"$\dot{x}$")
-
-        plt.suptitle("Phase portrait " + self.title)
-        plt.title(self.param_desciption)
-
         if save_filepath is not None:
-            plt.savefig(save_filepath)
+            plt.savefig(save_filepath, dpi=300)
 
-        if show:
-            plt.show()
-        
-    def signal(self, show = False, save_filepath = None):
-        fig, axs = plt.subplots(2)
+    def signal(self, save_filepath = None, hd_aspect = False):
+        if hd_aspect:
+            fig, axs = plt.subplots(2, figsize = self.hd_size)
+        else:
+            fig, axs = plt.subplots(2)
 
         axs[0].plot(self.t, self.x)
         axs[0].set(ylabel=r"$x$")
@@ -157,5 +176,45 @@ class VdP_Plotter():
         if save_filepath is not None:
             plt.savefig(save_filepath)
 
-        if show:
-            plt.show()
+    def threedee(self, save_filepath=None, hd_aspect = False):
+        fig = plt.figure()
+        ax_3d = plt.subplot(projection='3d')
+        # colored_lines = colored_line(self.x, self.xder, self.t, ax_3d,cmap_trunc = [0.15, 0.75], cmap='magma_r', label=f"Bernstein Splines ({self.comp_time:.4f} s)", linewidth=2)
+
+        cmap = mpl.colormaps[self.cmap_name]
+        N_x = len(self.x)
+        cmap_tr = truncate_colormap(cmap, self.cmap_trunc[0], self.cmap_trunc[1], n=N_x)
+        # breakpoint()
+
+        for i in range(N_x-1):
+            ax_3d.plot(self.x[i:(i+2)], self.xder[i:(i+2)], self.t[i:(i+2)], color = cmap_tr(i/N_x))
+        ax_3d.set_xlabel(r'$x$')
+        ax_3d.set_ylabel(r'$\dot{x}$')
+        ax_3d.set_zlabel(r'$t$')
+
+    def fourier_spectrum(self, save_filepath=None, hd_aspect = False):
+        if hd_aspect:
+            fig, axs = plt.subplots(2, figsize = self.hd_size)
+        else:
+            fig, axs = plt.subplots(2)
+
+        f_x, f_xder = fft(self.x), fft(self.xder)
+
+        N = len(self.x)
+        T_samplespacing = self.T/(N)*(1/(2*np.pi))
+        w = blackman(N)
+
+        ywf = fft(self.x*w)
+        xf = fftfreq(N, T_samplespacing)[:N//2]
+
+        axs[0].plot(xf[1:N//10], 2.0/N * np.abs(f_x[1:N//10]))
+        axs[0].set(ylabel=r"$x$ Fourier spectrum")
+
+        axs[1].plot(xf[1:N//10], 2.0/N * np.abs(f_xder[1:N//10]))
+        axs[1].set(ylabel=r"$\dot{x}$ Fourier spectrum")
+                
+        plt.xlabel(r"Freq domain $2\pi t$")
+        plt.suptitle(f"Fourier spectrum of {self.title}\n" + self.param_desciption)
+
+        if save_filepath is not None:
+            plt.savefig(save_filepath)

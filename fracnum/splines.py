@@ -1,4 +1,3 @@
-import numpy as np
 import math
 import time
 from scipy.special import gamma, betainc, beta, binom, comb
@@ -7,6 +6,14 @@ import cv2
 import os
 from tqdm import tqdm
 from mpmath import hyp1f2
+
+# AWAS! AWAS! AWAS!
+import numpy as np
+# import cupy as np
+
+import scipy.sparse as sp
+# import opt_einsum as oe
+
 
 class BernsteinSplines: 
     def __init__(self, t_knot_vals, n, n_eval = None):
@@ -66,7 +73,7 @@ class BernsteinSplines:
         for i in range(len(t_knot_vals)-1):
             total_t_vals_ord[i, :] = np.linspace(t_knot_vals[i], t_knot_vals[i+1], n+1)
 
-        t_eval_points = np.concatenate([[t_knot_vals[0]],np.reshape(total_t_vals_ord[:, 1:], (len(t_knot_vals)-1)*n)])
+        t_eval_points = np.concatenate([np.array([t_knot_vals[0]]),np.reshape(total_t_vals_ord[:, 1:], (len(t_knot_vals)-1)*n)])
         # breakpoint()
         return total_t_vals_ord, t_eval_points
 
@@ -108,7 +115,7 @@ class BernsteinSplines:
                 B_I_vals_list = dt**alpha * BernsteinSplines.I_a_b_beta(s_i, alpha, order_k, [0, 1])
                 # The reshaping instead of doing a for loop makes everything much much faster and saves k computations
                 B_I[i_knot, order_k, :, :] = BernsteinSplines.a_to_matrix(B_I_vals_list, self.n_eval)
-        return B_I
+        return B_I#, sp.coo_matrix(B_I.reshape(-1))
     
     def build_binom_basis(self):
         binom_basis = np.zeros([self.n+1, self.n+1])
@@ -116,7 +123,7 @@ class BernsteinSplines:
         for j in range(self.n+1):
             for l in range(j, self.n+1):
                 binom_basis[j, l] = binom(self.n, l) * binom(l, j) * (-1)**(l-j)
-        return binom_basis
+        return binom_basis#, sp.coo_matrix(binom_basis.reshape(-1))
         
     def I_a(self, A, alpha = None, knot_sel = None, to_vector = False):
         if alpha is not None:
@@ -134,6 +141,7 @@ class BernsteinSplines:
             
             # int = np.einsum('kl,klm->km', A@self.B_b, self.B_I[alpha])
     
+            # int = oe.contract('kl,klmn->mn', A@self.B_b_sparse, self.B_I_sparse[alpha])
             int = np.einsum('kl,klmn->mn', A@self.B_b, self.B_I[alpha])
         elif knot_sel[0] == 'to':
             # breakpoint()
@@ -221,9 +229,11 @@ class BernsteinSplines:
             C = self.C_storage[index_tuple]
         else:
             C = self.construct_C_matrix(n, m)
+            # C = sp.coo_matrix(C.reshape(-1))
             self.C_storage[index_tuple] = C
         D = np.zeros([n_rows, n+m+1])
 
+        # breakpoint()
         D = np.einsum('kij,mi,mj->mk', C, A, B)
 
         # breakpoint()
