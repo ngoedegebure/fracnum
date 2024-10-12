@@ -21,5 +21,5 @@ python -m venv .venv ; source .venv/bin/activate ; python -m pip install -e .
 ## Example run for some pretty pictures:
 
 ```
-python examples/frac_vdp_oscillator_example.py
+python examples/VdP/frac_vdp_oscillator_example.py
 ```

@@ -1,0 +1,3 @@
+.venv/
+fracnum.egg-info/
+__pycache__/
