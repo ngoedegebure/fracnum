@@ -2,6 +2,7 @@ import numpy as np
 from fracnum.splines import BernsteinSplines
 from fracnum.plotting_utils import VdP_Plotter
 
+
 """
 Example file of using Bernstein splines for time-integrating the (forced) fractional Van der Pol oscillator in the sense:
 

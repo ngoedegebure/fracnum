@@ -65,7 +65,7 @@ def colored_line(x, y, c, ax, cmap_trunc = [0,1], **lc_kwargs):
     #   [(x2_start, y2_start), (x2_mid, y2_mid), (x2_end, y2_end)],
     #   ...
     # ]
-    
+
 
     lc = LineCollection(segments, **default_kwargs)
     lc.set_array(c)  # set the colors of each segment
@@ -89,11 +89,11 @@ class VdP_Plotter():
         self.x = x
         self.xder = xder
         self.t = t
-        self.params = params 
+        self.params = params
         self.alpha = alpha
         self.dt = dt
         self.T = T
-        self.n_eval = n_eval 
+        self.n_eval = n_eval
         self.comp_time = comp_time
         self.forcing_params = forcing_params
 
@@ -136,7 +136,7 @@ class VdP_Plotter():
         lines = colored_line(self.x, self.xder, self.t, ax_phase,cmap_trunc = self.cmap_trunc, cmap=self.cmap_name, label=f"Bernstein Splines ({self.comp_time:.4f} s)", linewidth=2)
 
         if not empty:
-            margin_pct = 0.1    
+            margin_pct = 0.1
 
             ax_phase.set(xlabel = r"$x$", ylabel =r"$\dot{x}$")
 
@@ -169,7 +169,7 @@ class VdP_Plotter():
 
         axs[1].plot(self.t, self.xder)
         axs[1].set(ylabel=r"$\dot{x}$")
-                
+
         plt.xlabel('t')
         plt.suptitle(f"Signal of {self.title}\n" + self.param_desciption)
 
@@ -212,7 +212,7 @@ class VdP_Plotter():
 
         axs[1].plot(xf[1:N//10], 2.0/N * np.abs(f_xder[1:N//10]))
         axs[1].set(ylabel=r"$\dot{x}$ Fourier spectrum")
-                
+
         plt.xlabel(r"Freq domain $2\pi t$")
         plt.suptitle(f"Fourier spectrum of {self.title}\n" + self.param_desciption)
 

@@ -15,7 +15,7 @@ import scipy.sparse as sp
 # import opt_einsum as oe
 
 
-class BernsteinSplines: 
+class BernsteinSplines:
     def __init__(self, t_knot_vals, n, n_eval = None):
         self.t_knot_vals = t_knot_vals
         self.h = np.diff(t_knot_vals)
@@ -37,7 +37,7 @@ class BernsteinSplines:
         self.B_I = dict()
         # I took the following out so that it does not do anything double
 
-        # self.B_I[self.alpha] = self.build_integral_basis(self.alpha) 
+        # self.B_I[self.alpha] = self.build_integral_basis(self.alpha)
         self.B_b = self.build_binom_basis()
 
         # self.B_d_eval = self.build_der_basis(self.n_eval)
@@ -88,18 +88,18 @@ class BernsteinSplines:
         total_a_matrix[:-1, -1] = total_a_matrix[1:, 0]    # last column except for last element
         total_a_matrix[-1, -1] = a_vector[-1]               # last column last row
         return total_a_matrix
-    
+
     @staticmethod
     def a_to_vector(total_a_matrix):
         a_vector = np.zeros(total_a_matrix[:, :-1].size + 1)
-        
+
         last_val = total_a_matrix[-1, -1]
         a_vector[:-1] = total_a_matrix[:, :-1].reshape(a_vector[:-1].shape)
         a_vector[-1] = last_val
         return a_vector
-    
+
     def build_integral_basis(self, alpha):
-        
+
         # B_I[knot_calc, order_calc, order_eval]
         B_I = np.zeros([self.t_tot_vals_ord.shape[0], self.t_tot_vals_ord.shape[1], self.t_eval_vals_ord.shape[0], self.t_eval_vals_ord.shape[1]])
 
@@ -110,13 +110,13 @@ class BernsteinSplines:
             dt = t_b-t_a
 
             s_i = (self.t_eval_vals_list-t_a)/dt
-            
+
             for order_k in range(self.t_tot_vals_ord.shape[1]):
                 B_I_vals_list = dt**alpha * BernsteinSplines.I_a_b_beta(s_i, alpha, order_k, [0, 1])
                 # The reshaping instead of doing a for loop makes everything much much faster and saves k computations
                 B_I[i_knot, order_k, :, :] = BernsteinSplines.a_to_matrix(B_I_vals_list, self.n_eval)
         return B_I#, sp.coo_matrix(B_I.reshape(-1))
-    
+
     def build_binom_basis(self):
         binom_basis = np.zeros([self.n+1, self.n+1])
 
@@ -124,7 +124,7 @@ class BernsteinSplines:
             for l in range(j, self.n+1):
                 binom_basis[j, l] = binom(self.n, l) * binom(l, j) * (-1)**(l-j)
         return binom_basis#, sp.coo_matrix(binom_basis.reshape(-1))
-        
+
     def I_a(self, A, alpha = None, knot_sel = None, to_vector = False):
         if alpha is not None:
             if alpha not in self.B_I.keys():
@@ -134,13 +134,13 @@ class BernsteinSplines:
             return False
 
         # add new alpha functionality
-        
+
         if knot_sel is None:
             # A = BernsteinSplines.a_to_matrix(a, self.n)
             # breakpoint()
-            
+
             # int = np.einsum('kl,klm->km', A@self.B_b, self.B_I[alpha])
-    
+
             # int = oe.contract('kl,klmn->mn', A@self.B_b_sparse, self.B_I_sparse[alpha])
             int = np.einsum('kl,klmn->mn', A@self.B_b, self.B_I[alpha])
         elif knot_sel[0] == 'to':
@@ -155,14 +155,14 @@ class BernsteinSplines:
         #     # A = BernsteinSplines.a_to_matrix(a, self.n)[:calc_sel]
         #     B_I = self.B_I[alpha][:calc_sel, :, eval_sel]
         #     coeff = A@self.B_b
-        
+
         #     int = np.tensordot(coeff, B_I[alpha])
         if to_vector:
             return self.a_to_vector(int)
         else:
             return int
         # return BernsteinSplines.a_to_matrix(int, self.n_eval)
-    
+
     def sin_I_a(self, t, alpha, omega):
         if alpha == 0:
             result = np.sin(omega*t)
@@ -176,9 +176,9 @@ class BernsteinSplines:
             term2 = hyp1f2(alpha / 2 + 1 / 2, 3 / 2, alpha / 2 + 3 / 2, -1 / 4 * omega**2 * t**2)
 
             # Define the full expression
-            result = (t**alpha * ((np.sin(omega * t) * term1) / alpha - 
+            result = (t**alpha * ((np.sin(omega * t) * term1) / alpha -
                             (omega * t * np.cos(omega * t) * term2) / (alpha + 1))) / gamma(alpha)
-        
+
         return result
 
     def ddt(self, A, to_vector=True):
@@ -204,14 +204,14 @@ class BernsteinSplines:
     def construct_C_matrix(n, m):
         """Construct the matrix C of size (n+m+1) x (n+1) x (m+1)."""
         C = np.zeros((n+m+1, n+1, m+1))
-        
+
         # Fill in the C matrix
         for i in range(n+1):
             for j in range(m+1):
                 k = i + j
                 if k <= n + m:
                     C[k, i, j] = (binom(n, i) * binom(m, j)) / binom(n+m, k)
-        
+
         return C
 
     def splines_multiply_matrix(self, A, B, scale= False):
@@ -220,10 +220,10 @@ class BernsteinSplines:
             return False
         else:
             n_rows = A.shape[0]
-        
+
         n = A.shape[1] - 1
         m = B.shape[1] - 1
-        
+
         index_tuple = (n, m)
         if index_tuple in self.C_storage.keys():
             C = self.C_storage[index_tuple]
@@ -238,7 +238,7 @@ class BernsteinSplines:
 
         # breakpoint()
         return D
-    
+
     def splines_upscale(self, A, n, override_plusone = False):
         index_tuple = (A.shape, n)
         if (A.shape, n) in self.upscale_storage.keys():
@@ -248,14 +248,14 @@ class BernsteinSplines:
                 mult_shape = 2
             else:
                 mult_shape = A.shape[1]*(n-1)-1
-                
+
             scale_matrix = np.ones([A.shape[0], mult_shape])
             self.upscale_storage[index_tuple] = scale_matrix
 
         # CAN BE OPTIMIZED MORE!
         result = self.splines_multiply_matrix(A, scale_matrix, scale=True)
         return result
-        
+
     def solve_ivp_global(self, f, x_0, alpha, T, periodic = False, tol = 1e-12, div_treshold = 5e2,  N_it_max = 500, norm = 'sup', video = None, remember_x = True, f_params = None, verbose = True):
         if video is not None:
             video_plot = True
@@ -285,7 +285,7 @@ class BernsteinSplines:
             x_prev = x.copy()
 
             f_a_vals = f(self.t_eval_vals_ord, x, f_params, bernstein=True)
-            
+
             for k in range(d):
                 int_vals = self.I_a(f_a_vals[k, :, :], alpha = alpha)
                 x[k, :, :] = x_0[k] + int_vals
@@ -298,8 +298,8 @@ class BernsteinSplines:
                 plt.title("Iteration + "+str (n_tot_it))
                 plt.xlabel('x')
                 plt.ylabel('y')
-                plt.plot(x[:,0], x[:,1])
-                plt.savefig(video_path+str(int(n_tot_it))+'.png', dpi = 300)
+                plt.plot(x[:, 0], x[:, 1])
+                plt.savefig(video_path+str(int(n_tot_it))+'.png', dpi=300)
                 plt.close()
 
             if norm == 'sup':
@@ -307,7 +307,7 @@ class BernsteinSplines:
             else:
                 it_norm = np.linalg.norm(x-x_prev)
                 # it_norm = np.sqrt(np.inner(x-x_prev, x-x_prev))
-            
+
             if verbose:
                 print('Norm change', it_norm)
             if it_norm < tol:
@@ -344,13 +344,17 @@ class BernsteinSplines:
 
         if video_plot:
             BernsteinSplines.write_video(video_path)
-        
+
         return output_dict
-    
-    def solve_ivp_local(self, f, x_0, alpha, T, periodic = False, tol = 1e-12, div_treshold = 5e2,  N_it_max = 500, norm = 'sup', video = None, remember_x = True, f_params = None, verbose = True, sin_forcing_params = None):
+
+    def solve_ivp_local(self, f, x_0, alpha, T,
+                        periodic=False, tol=1e-12, div_treshold=5e2,
+                        N_it_max=500, norm='sup', video=None,
+                        remember_x=True, f_params=None, verbose=True,
+                        sin_forcing_params=None):
         if video is not None:
             video_plot = True
-            video_path = 'video_path/video_'+ str(int(time.time()))+'/'
+            video_path = 'video_path/video_' + str(int(time.time()))+'/'
         else:
             video_plot = False
 
@@ -361,7 +365,7 @@ class BernsteinSplines:
         elif np.array(alpha).size != d:
             print("ERROR! Either give one alpha or d (dimensions) alpha's!")
             return False
-        
+
         N_tot = len(self.t_eval_vals_list)
 
         if remember_x and self.x_storage is not None:
@@ -402,7 +406,7 @@ class BernsteinSplines:
                 x_prev = x.copy()
                 # breakpoint()
                 f_a_vals_tot[:, i_knot:(i_knot+1), :] = f(self.t_eval_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :], f_params, bernstein=True)
-                
+
                 for k in range(d):
                     # Saves some time
                     int_vals = self.I_a(f_a_vals_tot[k, i_knot, :], alpha =  alpha[k], knot_sel = ('at', i_knot))
@@ -428,7 +432,7 @@ class BernsteinSplines:
                 else:
                     it_norm = np.linalg.norm(x-x_prev)
                     # it_norm = np.sqrt(np.inner(x-x_prev, x-x_prev))
-                
+
                 if verbose:
                     print('Norm change', it_norm)
                 if it_norm < tol:
@@ -464,19 +468,19 @@ class BernsteinSplines:
 
         if video_plot:
             BernsteinSplines.write_video(video_path)
-        
+
         return output_dict
-    
+
     ### TODO: IMPLEMENT METHOD FOR CALCULATING HIGH RES FUNCTION VALUES!!! ###
 
     ### TODO: IMPLEMENT METHOD FOR CALCULATING DERIVATIVE VALUES!!! ###
 
-    # def 
+    # def
 
     @staticmethod
     def write_video(video_path, fps = 10):
         print('Generating video...')
-        
+
         image_folder = video_path
         video_name = video_path+'/output_video.mp4'
 
