@@ -1,16 +1,15 @@
 import numpy as np
-import math
-from scipy.special import comb
 from scipy.optimize import root as scipy_root
 from scipy.special import binom
 from scipy.special import gamma as gammafunction
-from scipy.special import gamma, hyp2f1
+from scipy.special import gamma
 
 from scipy.sparse import csr_array
 
-def ivp_int(f, alpha, u_0, t_limits, dt, method = "CN"):
+
+def ivp_int(f, alpha, u_0, t_limits, dt, method="CN"):
     N = int(np.abs(t_limits[1] -  t_limits[0])/dt)
-    t_vals = np.linspace(t_limits[0], t_limits[1], num = N)
+    t_vals = np.linspace(t_limits[0], t_limits[1], num=N)
     u_sols = np.zeros([N, len(u_0)])
     u_sols[0] = u_0
     I_old = 0
@@ -27,17 +26,17 @@ def ivp_int(f, alpha, u_0, t_limits, dt, method = "CN"):
             I_old = I_i
         elif method == "BE":
             kernel = kernel_new
-            
+
             u_sols_avg = np.roll((u_sols[:i].T + np.roll(u_sols[:i].T, shift=-1))/2, shift=1)
             u_sols_avg[:, 0] = u_0
 
             I_i = f(t_vals[:i]+dt/2, u_sols_avg)@kernel*dt
-            
+
             kernel_new = (t_vals[i] + dt/2 - t_vals[:(i+1)])**(alpha-1)
 
             def BE_root_problem(u_new):
                 return u_new - (u_sols[i-1] + (f(t_vals[:(i+1)]+dt/2, np.r_[u_sols_avg.T, [(u_new + u_sols_avg[:, -1])/2]].T)@kernel_new*dt - I_i))
-            
+
             root_res = scipy_root(BE_root_problem, u_sols[i-1])
 
             if root_res.success == False:
@@ -52,16 +51,16 @@ def ivp_int(f, alpha, u_0, t_limits, dt, method = "CN"):
             k_2 = f(0, u_sols[i-1] + dt*k_1/2)
             k_3 = f(0, u_sols[i-1] + dt*k_2/2)
             k_4 = f(0, u_sols[i-1] + dt*k_3)
-            
+
             u_sols[i] = u_sols[i-1] + dt/6 * (k_1 + 2*k_2+2*k_3+k_4)
         elif method == "CN":
             # kernel = kernel_new
-            
+
             # u_sols_avg = np.roll((u_sols[:i].T + np.roll(u_sols[:i].T, shift=-1))/2, shift=1)
             # u_sols_avg[:, 0] = u_0
 
             # I_i = f(t_vals[:i]+dt/2, u_sols_avg)@kernel*dt
-            
+
             # kernel_new = (t_vals[i] + dt/2 - t_vals[:(i+1)])**(alpha-1)
 
             # def CN_root_problem(u_new):
@@ -87,17 +86,17 @@ def ivp_int(f, alpha, u_0, t_limits, dt, method = "CN"):
             I_old = I_i
         elif method == "CN_mid":
             kernel = kernel_new
-            
+
             u_sols_avg = np.roll((u_sols[:i].T + np.roll(u_sols[:i].T, shift=-1))/2, shift=1)
             u_sols_avg[:, 0] = u_0
 
             I_i = f(t_vals[:i]+dt/2, u_sols_avg)@kernel*dt
-            
+
             kernel_new = (t_vals[i] + dt/2 - t_vals[:(i+1)])**(alpha-1)
 
             def CN_root_problem(u_new):
                 return u_new - u_sols[i-1] - 0.5* ((I_i-I_old) + (f(t_vals[:(i+1)]+dt/2, np.r_[u_sols_avg.T, [(u_new + u_sols_avg[:, -1])/2]].T)@kernel_new*dt - I_i))
-            
+
             root_res = scipy_root(CN_root_problem, u_sols[i-1])
 
             if root_res.success == False:
@@ -181,6 +180,7 @@ def ivp_diethelm(f, alpha, u_0, t_limits, dt, f_params = None):
 
     return a@bernstein_alpha
 
+
 def I_trap(u, alpha, t_limits, dt):
     return dt**(1-alpha)/(gammafunction(2-alpha) * 2) * np.sum(u[1:] + u[:-1])
 
@@ -262,25 +262,25 @@ def J_rl_rect(N, alpha_int, t_vals_int, sparse = True):
 #     @staticmethod
 #     def I_loc(t_vals, alpha, k, support):
 #         a, b = support
-        
+
 #         t_pre = t_vals[t_vals <= a]
 #         t_in = t_vals[(t_vals > a) & (t_vals <=b)]
 #         t_post = t_vals[(t_vals > b)]
 
 #         I_pre = np.zeros(t_pre.shape)
-        
+
 #         I_in = bernstein.I_a_b(t_in, alpha, k, a, t_in)
 
-#         I_post = bernstein.I_a_b(t_post, alpha, k, a, b) 
+#         I_post = bernstein.I_a_b(t_post, alpha, k, a, b)
 
 #         return np.concatenate([I_pre, I_in, I_post])
-    
+
 #     def I_splines_tot(a, alpha, t_knot_vals, n_p, t_eval = None):
 #         N_blocks = len(t_knot_vals) - 1
 #         N_tot = N_blocks * (n_p+1)-(N_blocks-1)
 #         T = t_knot_vals[-1]
 #         t_vals = np.linspace(0,T, N_tot)
-        
+
 #         if t_eval is None:
 #             t_eval = t_vals
 
@@ -290,7 +290,7 @@ def J_rl_rect(N, alpha_int, t_vals_int, sparse = True):
 #             t_a = t_knot_vals[i_b]
 #             t_b = t_knot_vals[i_b+1]
 #             # print('t_a, t_b',t_a, t_b)
-            
+
 #             # get all polynomials
 #             for i_p in range(n_p + 1):
 #                 i_t = i_b * (n_p) + i_p  # t index
