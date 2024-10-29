@@ -1,0 +1,3 @@
+from .static_spline_methods import SplineMethods 
+from .static_bernstein_methods import BernsteinMethods
+from .bernstein_splines import BernsteinSplines

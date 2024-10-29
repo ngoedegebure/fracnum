@@ -85,7 +85,7 @@ def truncate_colormap(cmap, minval=0.2, maxval=0.8, n=100):
     return new_cmap
 
 class VdP_Plotter():
-    def __init__(self, x, xder, t, params, alpha, dt, T, n_eval, comp_time, forcing_params = None, cmap_name="magma_r", cmap_trunc = [0.15, 0.75]):
+    def __init__(self, x, xder, t, params, alpha, dt, T, n_eval, comp_time, forcing_params = None, lims_override = None, cmap_name="magma_r", cmap_trunc = [0.15, 0.75]):
         self.x = x
         self.xder = xder
         self.t = t
@@ -95,23 +95,41 @@ class VdP_Plotter():
         self.T = T
         self.n_eval = n_eval
         self.comp_time = comp_time
-        self.forcing_params = forcing_params
+        self.forcing_params = forcing_params[0] # Take just the first element in this case. Can be made more general
 
         self.cmap_name = cmap_name
         self.cmap_trunc = cmap_trunc
 
         self.hd_size = (16/2, 9/2)
 
+        self.forcing = False
         self.title, self.param_desciption = self.generate_captions()
+
+        if lims_override is not None:
+            if 'x' in lims_override.keys() and 'xder' in lims_override.keys():
+                self.x_lims = lims_override['x']
+                self.xder_lims = lims_override['xder']
+            if 'fourier_amp' in lims_override.keys():
+                self.fourier_amp_lim = lims_override['fourier_amp']
+            else:
+                self.fourier_amp_lim = None
+        else:
+            self.x_lims = [min(self.x), max(self.x)]
+            self.xder_lims = [min(self.xder), max(self.xder)]
+            self.fourier_amp_lim = None
 
     def show_plots(self):
         plt.show()
 
+    def close_plots(self):
+        plt.close('all')
+
     def generate_captions(self):
-        forcing_string = ""
+        forcing_string = "unforced "
         forcing_settings_string = ""
         if self.forcing_params is not None:
-            if self.forcing_params['A'] != 0:
+            if self.forcing_params['A'] != 0 and self.forcing_params['omega'] != 0 :
+                self.forcing = True
                 forcing_string = 'forced '
                 forcing_settings_string = r", A="+str(self.forcing_params['A'])+r", \omega="+str(np.round(self.forcing_params['omega'],4))
 
@@ -127,16 +145,16 @@ class VdP_Plotter():
 
         return title, subtitle
 
-    def phase(self, save_filepath=None, hd_aspect = False, empty=False):
+    def phase(self, save_filepath=None, hd_aspect = False, empty=False, add_text = None):
         if hd_aspect:
-            fig_phase, ax_phase = plt.subplots(figsize = self.hd_size)
+            fig_phase, ax_phase = plt.subplots(figsize = self.hd_size, layout="constrained")
         else:
             fig_phase, ax_phase = plt.subplots()
 
         lines = colored_line(self.x, self.xder, self.t, ax_phase,cmap_trunc = self.cmap_trunc, cmap=self.cmap_name, label=f"Bernstein Splines ({self.comp_time:.4f} s)", linewidth=2)
 
         if not empty:
-            margin_pct = 0.1
+            margin_pct_x, margin_pct_y = 0.1, 0.1
 
             ax_phase.set(xlabel = r"$x$", ylabel =r"$\dot{x}$")
 
@@ -144,19 +162,24 @@ class VdP_Plotter():
             plt.title(self.param_desciption)
             fig_phase.colorbar(lines, label=r'$t$')
         else:
-            margin_pct = 0.01
+            margin_pct_x, margin_pct_y = 0.3, 0.07
             ax_phase.set_axis_off()
 
-        x_dist = max(self.x) - min(self.x)
-        margin_x = margin_pct * x_dist
-        ax_phase.set_xlim(min(self.x)-margin_x, max(self.x)+margin_x)
+        x_dist = self.x_lims[1] - self.x_lims[0]
+        margin_x = margin_pct_x * x_dist
+        ax_phase.set_xlim(self.x_lims[0]-margin_x, self.x_lims[1]+margin_x)
 
-        y_dist = max(self.xder) - min(self.xder)
-        margin_y = margin_pct * y_dist
-        ax_phase.set_ylim(min(self.xder)-margin_y, max(self.xder)+margin_y)
+        y_dist = self.xder_lims[1] - self.xder_lims[0]
+        margin_y = margin_pct_y * y_dist
+        ax_phase.set_ylim(self.xder_lims[0]-margin_y, self.xder_lims[1]+margin_y)
+
+        if add_text is not None:
+            label_text = ax_phase.text(0.88, 0.075, add_text, transform=ax_phase.transAxes)
 
         if save_filepath is not None:
             plt.savefig(save_filepath, dpi=300)
+
+        return ax_phase
 
     def signal(self, save_filepath = None, hd_aspect = False):
         if hd_aspect:
@@ -167,14 +190,22 @@ class VdP_Plotter():
         axs[0].plot(self.t, self.x)
         axs[0].set(ylabel=r"$x$")
 
+        pct_margin = 0.10 
+
+        margin_x = (self.x_lims[1] - self.x_lims[0])*pct_margin
+        axs[0].set_ylim([self.x_lims[0]-margin_x, self.x_lims[1]+margin_x])
+
         axs[1].plot(self.t, self.xder)
         axs[1].set(ylabel=r"$\dot{x}$")
+
+        margin_y = (self.xder_lims[1] - self.xder_lims[0])*pct_margin
+        axs[1].set_ylim([self.xder_lims[0]-margin_y, self.xder_lims[1]+margin_y])
 
         plt.xlabel('t')
         plt.suptitle(f"Signal of {self.title}\n" + self.param_desciption)
 
         if save_filepath is not None:
-            plt.savefig(save_filepath)
+            plt.savefig(save_filepath, dpi=300)
 
     def threedee(self, save_filepath=None, hd_aspect = False):
         fig = plt.figure()
@@ -213,8 +244,77 @@ class VdP_Plotter():
         axs[1].plot(xf[1:N//10], 2.0/N * np.abs(f_xder[1:N//10]))
         axs[1].set(ylabel=r"$\dot{x}$ Fourier spectrum")
 
+        if self.fourier_amp_lim is not None:
+            axs[0].set_ylim(self.fourier_amp_lim)
+            axs[1].set_ylim(self.fourier_amp_lim)
+
         plt.xlabel(r"Freq domain $2\pi t$")
         plt.suptitle(f"Fourier spectrum of {self.title}\n" + self.param_desciption)
 
         if save_filepath is not None:
-            plt.savefig(save_filepath)
+            plt.savefig(save_filepath, dpi = 300)
+
+    def phase_fourier(self, save_filepath=None):
+        grid = [
+            ['phase', 'fourier_x'],
+            ['phase', 'fourier_xder']
+        ]
+        
+        fig, axs = plt.subplot_mosaic(grid, figsize = self.hd_size, layout="constrained")
+
+        plt.suptitle("\nPhase portrait and fourier spectrum " + self.title + "\n" + self.param_desciption)
+
+        # TODO: MAKE MODULAR!
+        # PHASE #
+        lines = colored_line(self.x, self.xder, self.t, axs["phase"],cmap_trunc = self.cmap_trunc, cmap=self.cmap_name, label=f"Bernstein Splines ({self.comp_time:.4f} s)", linewidth=2)
+
+        margin_pct = 0.1
+
+        axs["phase"].set(xlabel = r"$x$", ylabel =r"$\dot{x}$")
+        # axs["phase"].colorbar(lines, label=r'$t$')
+
+        x_dist = self.x_lims[1] - self.x_lims[0]
+        margin_x = margin_pct * x_dist
+        axs["phase"].set_xlim(self.x_lims[0]-margin_x, self.x_lims[1]+margin_x)
+
+        y_dist = self.xder_lims[1] - self.xder_lims[0]
+        margin_y = margin_pct * y_dist
+        axs["phase"].set_ylim(self.xder_lims[0]-margin_y, self.xder_lims[1]+margin_y)
+
+        # Fourier #
+
+        f_x, f_xder = fft(self.x), fft(self.xder)
+
+        N = len(self.x)
+        T_samplespacing = self.T/(N)*(1/(2*np.pi))
+        # w = blackman(N)
+
+        # ywf = fft(self.x*w)
+        xf = fftfreq(N, T_samplespacing)[:N//2]
+
+        select_div = 15
+
+        if self.forcing:
+            omega = self.forcing_params['omega']
+            axs['fourier_x'].axvline(x = omega, color = 'red', linestyle = '--', linewidth = 1.5, label = 'Forcing')
+            axs['fourier_x'].legend()
+            axs['fourier_xder'].axvline(x = omega, color = 'red', linestyle = '--', linewidth = 1.5)
+
+        axs['fourier_x'].plot(xf[1:N//select_div], 2.0/N * np.abs(f_x[1:N//select_div]))
+        axs['fourier_x'].set(ylabel=r"$x$ amplitude")
+
+        axs['fourier_xder'].plot(xf[1:N//select_div], 2.0/N * np.abs(f_xder[1:N//select_div]))
+        axs['fourier_xder'].set(ylabel=r"$\dot{x}$ amplitude")
+
+        axs['fourier_xder'].set_xlabel(r"Frequency ($2\pi t$)")
+
+        if self.fourier_amp_lim is not None:
+            axs['fourier_x'].set_ylim(self.fourier_amp_lim)
+            axs['fourier_xder'].set_ylim(self.fourier_amp_lim)
+
+        margin_pct_padding = 0.02
+        engine = fig.get_layout_engine()
+        engine.set(rect=(margin_pct_padding,margin_pct_padding,1-margin_pct_padding*2,1-margin_pct_padding*2))
+
+        if save_filepath is not None:
+            plt.savefig(save_filepath, dpi = 300)
