@@ -161,7 +161,10 @@ class SplineSolver():
                 x[k, :, :] = self.x_0[k] + int_vals
 
                 if np.array(self.forcing_vals[k]).size > 0:
-                    x[k, :, :] += self.forcing_vals[k][:, :]
+                    if bvp:
+                        print("WARNING! Forcing not yet supported for global BVP solver! No forcing added.")
+                    else:
+                        x[k, :, :] += self.forcing_vals[k][:, :]
 
                 if bvp:
                     delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
