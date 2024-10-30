@@ -1,7 +1,6 @@
 import time
 from scipy.special import gamma, betainc, beta
 from tqdm import tqdm
-from mpmath import hyp1f2
 import numpy as np
 
 class SplineMethods:
