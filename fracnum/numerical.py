@@ -1,7 +1,6 @@
 import numpy as np
 
 from scipy.special import gamma
-from scipy.sparse import csr_array
 from mpmath import hyp1f2
 
 def ivp_diethelm(f, u_0, alpha_vals, T, dt):
@@ -85,7 +84,7 @@ def sin_I_a(t, alpha, omega):
 
     return result
 
-def I_rl_rect_left(alpha_int, t_vals_int, sparse = True):
+def I_rl_rect_left(alpha_int, t_vals_int):
     N = len(t_vals_int)
     J = np.zeros([N, N])
 
@@ -94,6 +93,5 @@ def I_rl_rect_left(alpha_int, t_vals_int, sparse = True):
         for j in range(n):
             J[n,j] = h**alpha_int / alpha_int * ((n - j)**alpha_int - (n-1-j)**alpha_int)
     J = J*1/gamma(alpha_int)
-    if sparse:
-        J = csr_array(J)
+
     return J
