@@ -6,22 +6,28 @@ import numpy as np
 class SplineMethods:
     @staticmethod
     def build_total_t_vals(t_knot_vals, n):
-        total_t_vals_ord = np.zeros([len(t_knot_vals)-1, n+1])
+        # Builds the coefficient t values for chosen knots and polynomial order
+        # Returns both ordered per knot (first element) and a vector of all values (second element) 
 
-        for i in range(len(t_knot_vals)-1):
+        total_t_vals_ord = np.zeros([len(t_knot_vals)-1, n+1]) # Initialize the total t values
+
+        for i in range(len(t_knot_vals)-1): 
+            # Build ordered t values
             total_t_vals_ord[i, :] = np.linspace(t_knot_vals[i], t_knot_vals[i+1], n+1)
 
-        t_eval_points = np.concatenate([np.array([t_knot_vals[0]]),np.reshape(total_t_vals_ord[:, 1:], (len(t_knot_vals)-1)*n)])
+        # Flatten to vector and skip the "duplicate" final knot values
+        t_eval_points = np.concatenate([np.array([t_knot_vals[0]]), np.reshape(total_t_vals_ord[:, 1:], (len(t_knot_vals)-1)*n)])
         
         return total_t_vals_ord, t_eval_points
 
     @staticmethod
     def I_a_b_beta(t_vals, alpha, k, bounds):
-        a, b = bounds
+        # Computes the alpha-order integral of a polynomial s^k with support bounds = [a, b] on evaluation points t_vals
+        
+        a, b = bounds # Get a and b for alias
+        I_b = np.zeros(t_vals.shape) # Initialize shape
 
-        I_b = np.zeros(t_vals.shape)
-
-        t_in_indices = (t_vals > a)
+        t_in_indices = (t_vals > a) # Before a, all can be kept 0
         t_in = t_vals[t_in_indices] # Values in the integration interval
         t_trans = (t_in-a)/(b-a)    # Compute transformation of t
 
