@@ -11,6 +11,15 @@ import matplotlib as mpl
 
 from matplotlib.collections import LineCollection
 
+from matplotlib import rc
+
+font_families = ['Segoe UI', 'Arial', 'Helvetica']
+rc('font',**{'family':'sans-serif','sans-serif':font_families})
+rc('font',**{'family':'cursive','cursive':font_families})
+mpl.rcParams['mathtext.fontset'] = 'stixsans' #['dejavusans', 'dejavuserif', 'cm', 'stix', 'stixsans', 'custom']
+# rc('font',**{'family':'serif','serif':['Times']})
+# rc('text', usetex=True)
+
 # https://matplotlib.org/stable/gallery/lines_bars_and_markers/multicolored_line.html
 def colored_line(x, y, c, ax, cmap_trunc = [0,1], **lc_kwargs):
     """
@@ -125,7 +134,11 @@ class VdP_Plotter():
         plt.close('all')
 
     def generate_captions(self):
+        fractional_string = "fractionally "
         forcing_string = "unforced "
+        damping_string = "damped "
+        oss_type = "VdP "
+
         forcing_settings_string = ""
         if self.forcing_params is not None:
             if self.forcing_params['A'] != 0 and self.forcing_params['omega'] != 0 :
@@ -138,10 +151,17 @@ class VdP_Plotter():
             fractional_string = ""
         else:
             fractional_settings_string = r"\alpha="+str(self.alpha)+r", "
-            fractional_string = "fractionally "
+            
+        if self.params['mu'] == 0:
+            # If mu = 0, the damping alpha does not affect anything
+            damping_string = ""
+            oss_type = "harmonic "
+            fractional_string = ""
+            fractional_settings_string = ""
 
-        title = fractional_string+"dampened "+forcing_string+"VdP Oscillator"
-        subtitle = "$" + fractional_settings_string + r"\mu="+str(self.params['mu'])+forcing_settings_string+r". T = "+str(np.round(self.T,2))+ r", h=" + str(np.round(self.dt,2)) + r", q = " + str(int(self.n_eval))+r"$"
+        title = f"{fractional_string}{damping_string}{forcing_string}{oss_type}Oscillator"
+        # title = fractional_string+"dampened "+forcing_string+"VdP Oscillator"
+        subtitle = "$" + fractional_settings_string + r"\mu="+str(self.params['mu'])+forcing_settings_string+r", T = "+str(np.round(self.T,2))+ r", h=" + str(np.round(self.dt,2)) + r", q = " + str(int(self.n_eval))+r"$"
 
         return title, subtitle
 
