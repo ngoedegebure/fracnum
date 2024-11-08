@@ -85,8 +85,9 @@ class SplineSolver():
         else:
             # Build as a constant function of the initial conditions
             N_tot = len(self.bs.t_eval_vals_list)
-            x_flat = np.ones([N_tot, self.d]) * self.x_0
-            x = np.array([SplineMethods.a_to_matrix(x_flat[:, i], self.bs.n_eval) for i in range(self.d)])
+            # x_flat = np.ones([N_tot, self.d]) * self.x_0
+            x_flat = self.bs.t_eval_vals_list*3/self.bs.t_eval_vals_list[-1]
+            x = np.array([SplineMethods.a_to_matrix(self.x_0[i]+x_flat[:], self.bs.n_eval) for i in range(self.d)])
 
         return x
 
@@ -149,7 +150,7 @@ class SplineSolver():
         f_a_vals_tot = np.zeros([self.d, N_knots, n_calc]) # Initialize the function value storage
         n_tot_it = 0 # Initialize total iteration counter
 
-        for i_knot in tqdm(range(N_knots), desc='Iterating IVP for knots'):
+        for i_knot in tqdm(range(N_knots), desc='Iterating IVP for knots', disable = (not verbose)):
             # Initialize the integral values for this knot
             int_vals_base = np.zeros([self.d, n_eval])
             if i_knot > 0:
@@ -211,10 +212,14 @@ class SplineSolver():
         # If bvp, keep track of the delta ( _0I^alpha_T f(x) )
         if bvp:
             delta = np.zeros(self.d)
+        
+        N_knots = self.bs.t_eval_vals_ord.shape[0] # Number of knots
+        n_calc = self.bs.t_calc_vals_ord.shape[1] # Spline polynomial order calculations f
+        f_a_vals = np.zeros([self.d, N_knots, n_calc])
 
         for n_tot_it in range(conv_max_it):
             x_prev = x.copy() # Store previous estimate for increment norm calculation later
-            f_a_vals = self.f(self.bs.t_eval_vals_ord, x) # Calculate f(x, t)
+            f_a_vals[:, :, :] = self.f(self.bs.t_eval_vals_ord, x) # Calculate f(x, t)
 
             for k in range(self.d):
                 # Get _0I^alpha_t f(x,t) for all t_eval
@@ -222,19 +227,19 @@ class SplineSolver():
                 # x = x_0 + _0I_t^alpha f(x,t)
                 x[k, :, :] = self.x_0[k] + int_vals
 
-                if np.array(self.forcing_vals[k]).size > 0:
+                if np.array(self.forcing_vals[k]).size > 1:
                     if bvp:
                         # TODO: implement forcing with delta computation
                         print("WARNING! Forcing not yet supported for global BVP solver! No forcing added.")
                     else:
                         # Add forcing
-                        x[k, :, :] += self.forcing_vals[k][:, :]
+                        x[k, :, :] += self.forcing_vals[k]
 
                 if bvp:
                     # Get delta computation
                     delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
                     # Substract integrated delta for BVP requirement
-                    x[k, :, :] -= (self.t_eval_vals_ord/T)**self.alpha[k] * self.delta[k]
+                    x[k, :, :] -= (self.bs.t_eval_vals_ord/T)**self.alpha[k] * delta[k]
 
             # Compute the iteration norm increment
             it_norm = SplineSolver.it_norm(x, x_prev, norm)
@@ -268,7 +273,7 @@ class SplineSolver():
             verbose = False):
         
         # Makes sure the integral basis is ready
-        self.bs.build_and_save_integral_basis(self.alpha, verbose= True)
+        self.bs.build_and_save_integral_basis(self.alpha, verbose= verbose)
         # Gets initial value for x
         x = self.get_initial_x(save_x)
 
@@ -298,7 +303,8 @@ class SplineSolver():
         # Build all results here
         result_dict = self.build_results_dict(x_sol, n_tot_it,norm, it_norm, total_time, f_0, T = T, delta = delta)
         # Get a nice human-readable summary of run time statistics
-        SplineSolver.print_summary(result_dict)        
+        if verbose:
+            SplineSolver.print_summary(result_dict)        
 
         # Save the solution if required
         if save_x:
