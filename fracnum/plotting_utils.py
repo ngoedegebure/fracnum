@@ -13,12 +13,12 @@ from matplotlib.collections import LineCollection
 
 from matplotlib import rc
 
+mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["lightseagreen", "orange", "limegreen"]) 
+
 font_families = ['Segoe UI', 'Arial', 'Helvetica']
 rc('font',**{'family':'sans-serif','sans-serif':font_families})
 rc('font',**{'family':'cursive','cursive':font_families})
-mpl.rcParams['mathtext.fontset'] = 'stixsans' #['dejavusans', 'dejavuserif', 'cm', 'stix', 'stixsans', 'custom']
-# rc('font',**{'family':'serif','serif':['Times']})
-# rc('text', usetex=True)
+mpl.rcParams['mathtext.fontset'] = 'stixsans' #Possible fonts: ['dejavusans', 'dejavuserif', 'cm', 'stix', 'stixsans', 'custom']
 
 # https://matplotlib.org/stable/gallery/lines_bars_and_markers/multicolored_line.html
 def colored_line(x, y, c, ax, cmap_trunc = [0,1], **lc_kwargs):
@@ -92,6 +92,11 @@ def truncate_colormap(cmap, minval=0.2, maxval=0.8, n=100):
         'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
         cmap(np.linspace(minval, maxval, n)))
     return new_cmap
+
+def get_lin_line_colors(N_x, cmap_name = 'magma', cmap_trunc = [0.15, 0.78]):
+    cmap = mpl.colormaps[cmap_name]
+    colors = cmap(np.linspace(cmap_trunc[0], cmap_trunc[1], N_x))
+    return colors
 
 class VdP_Plotter():
     def __init__(self, x, xder, t, params, alpha, dt, T, n_eval, comp_time, forcing_params = None, lims_override = None, cmap_name="magma_r", cmap_trunc = [0.15, 0.75]):
