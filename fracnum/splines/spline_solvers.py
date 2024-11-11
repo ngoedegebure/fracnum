@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 class SplineSolver():
     # Solver method for boundary and initial value problems (BVP and IVP's)
-    def __init__(self, bs, f, x_0, alpha_vals, forcing_parameters = {}):
+    def __init__(self, bs, f, x_0, alpha_vals, beta_vals = 1, forcing_parameters = {}):
         self.bs = bs        # Bernstein spline functions instance
         self.f = f          # System function f
         self.x_0 = x_0      # Initial value # TODO: maybe do this in running?
@@ -17,6 +17,10 @@ class SplineSolver():
 
         # Get alpha for all dimensions
         self.alpha = SplineSolver.parse_alpha(alpha_vals, self.d) 
+        # Get beta for all dimensions
+        self.beta = SplineSolver.parse_alpha(beta_vals, self.d) 
+        self.gamma = self.alpha + self.beta - self.alpha*self.beta
+        breakpoint()
         # Build forcing values
         self.forcing_vals = self.build_forcing_values(forcing_parameters)
         # Initialize x storage values
@@ -86,8 +90,10 @@ class SplineSolver():
             # Build as a constant function of the initial conditions
             N_tot = len(self.bs.t_eval_vals_list)
             # x_flat = np.ones([N_tot, self.d]) * self.x_0
-            x_flat = self.bs.t_eval_vals_list*3/self.bs.t_eval_vals_list[-1]
-            x = np.array([SplineMethods.a_to_matrix(self.x_0[i]+x_flat[:], self.bs.n_eval) for i in range(self.d)])
+            # x = np.array([SplineMethods.a_to_matrix(x_flat[:, i], self.bs.n_eval) for i in range(self.d)])
+            # OR:
+            x_flat = self.bs.t_eval_vals_list/self.bs.t_eval_vals_list[-1]
+            x = np.array([SplineMethods.a_to_matrix(self.x_0[i]+x_flat, self.bs.n_eval) for i in range(self.d)])
 
         return x
 
@@ -164,8 +170,9 @@ class SplineSolver():
                     # Hence, will not change in the next steps
                     int_vals_base[k, :] = self.bs.I_a(f_no_last[k, :, :], alpha = self.alpha[k], knot_sel = ('to', i_knot))
 
-                # Take the previous knot value as an initial guess for the to-be-calculated one
-                x[:, i_knot, :] = x[:, i_knot-1, :]
+                    # EXPERIMENT!
+                    # Take the previous knot's final value as an initial guess for the to-be-calculated one
+                    x[k, i_knot, :] = x[k, i_knot-1, -1] * np.ones(x[k, i_knot, :].shape)
 
             for conv_it in range(conv_max_it):
                 ### Main iteration: converge the value for the to-be-calculated knot t_M ###

@@ -4,7 +4,7 @@ from .static_bernstein_methods import BernsteinMethods
 from .spline_solvers import SplineSolver
 
 class BernsteinSplines:
-    def __init__(self, t_knot_vals, n, n_eval = None, alpha_init = None):        
+    def __init__(self, t_knot_vals, n, n_eval = None, alpha_init = None, silent_mode = False):        
         self.t_knot_vals = t_knot_vals  # Knot values t_0, t_1, t_2 ... t_k
         self.h = np.diff(t_knot_vals)   # Knot sizes h_0 ... h_{k-1}
         self.n = n                      # Polynomial calculation order
@@ -40,32 +40,46 @@ class BernsteinSplines:
         # Initialize forcing values storage
         self.forcing_storage = {}
 
-    def I_a_scalar(self, t, A, alpha):
+        self.silent_mode = silent_mode
+
+    def I_a_scalar(self, t, A, alpha, time_verbose = False):
         # A wrapper to more elegantly compute the integral at one specific time for a scalar t
         index_key = (alpha, t)
         if index_key not in self.B_I_scalar.keys():
             t_matrix_val = np.reshape(t, [1,1])
-            self.B_I_scalar[index_key] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, t_matrix_val, time_verbose=False, progress_verbose = False)
+            self.B_I_scalar[index_key] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, t_matrix_val, time_verbose=time_verbose, progress_verbose = False)
 
         int = np.einsum('kl,kl->',A@self.B_b, self.B_I_scalar[index_key][:, :, 0, 0])
         return int
 
-    def I_a(self, A, alpha, knot_sel = None, to_vector = False):
-        # Get or create the integration basis
-        if alpha not in self.B_I.keys():
-            self.B_I[alpha] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, self.t_eval_vals_ord)
+    def I_a(self, A, alpha, knot_sel = None, to_vector = False, progress_verbose = True, time_verbose = False):
+        if alpha == 0:
+            if knot_sel is None:
+                # All knots
+                int = A
+            elif knot_sel[0] == 'to':
+                knot_index = knot_sel[1]
+                int = A[:(knot_index+1)]
+            elif knot_sel[0] == 'at':
+                # Up to selected knot
+                knot_index = knot_sel[1]
+                int = A[knot_index:(knot_index+1)]
+        else:
+            # Get or create the integration basis
+            if alpha not in self.B_I.keys():
+                self.B_I[alpha] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose = progress_verbose, time_verbose = time_verbose)
 
-        if knot_sel is None:
-            # All knots
-            int = np.einsum('kl,klmn->mn', A@self.B_b, self.B_I[alpha])
-        elif knot_sel[0] == 'to':
-            # Up to selected knot
-            knot_index = knot_sel[1]
-            int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I[alpha][:(knot_index+1), :, knot_index, :])
-        elif knot_sel[0] == 'at':
-            # Only selected knot
-            knot_index = knot_sel[1]
-            int = np.einsum('l,ln->n', A@self.B_b, self.B_I[alpha][knot_index, :, knot_index, :])
+            if knot_sel is None:
+                # All knots
+                int = np.einsum('kl,klmn->mn', A@self.B_b, self.B_I[alpha])
+            elif knot_sel[0] == 'to':
+                # Up to selected knot
+                knot_index = knot_sel[1]
+                int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I[alpha][:(knot_index+1), :, knot_index, :])
+            elif knot_sel[0] == 'at':
+                # Only selected knot
+                knot_index = knot_sel[1]
+                int = np.einsum('l,ln->n', A@self.B_b, self.B_I[alpha][knot_index, :, knot_index, :])
 
         if to_vector:
             return SplineMethods.a_to_vector(int)
@@ -132,11 +146,13 @@ class BernsteinSplines:
         result = self.splines_multiply(A, scale_matrix)
         return result
     
-    def build_and_save_integral_basis(self, alpha_vals, verbose = False):
+    def build_and_save_integral_basis(self, alpha_vals, verbose = False, time_verbose = False):
+        if self.silent_mode:
+            verbose, time_verbose = False, False
         for alpha_val in alpha_vals:
             if alpha_val not in self.B_I.keys():
-                self.B_I[alpha_val] = SplineMethods.build_integral_basis(alpha_val, self.t_calc_vals_ord, self.t_eval_vals_ord, time_verbose=verbose)
+                self.B_I[alpha_val] = SplineMethods.build_integral_basis(alpha_val, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose=verbose, time_verbose=time_verbose)
     
-    def initialize_solver(self, f, x_0, alpha_vals, forcing_params = {}):
-        return SplineSolver(self, f, x_0, alpha_vals, forcing_parameters = forcing_params)
+    def initialize_solver(self, f, x_0, alpha_vals, beta_vals = 1,forcing_params = {}):
+        return SplineSolver(self, f, x_0, alpha_vals, beta_vals = beta_vals, forcing_parameters = forcing_params)
         

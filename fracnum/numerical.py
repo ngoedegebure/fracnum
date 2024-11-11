@@ -4,16 +4,14 @@ from scipy.special import gamma
 from mpmath import hyp1f2
 
 def ivp_diethelm(f, u_0, alpha_vals, T, dt):
-    #### TODO! MAKE FOR TWO ALPHA's!
-    h = dt #
+    h = dt
     N = int(T/h)
     t_vals = np.linspace(0, T, N+1)
 
     u_0_array = np.array([u_0])
-    f_u_0 = f(t_vals[0],u_0_array)
+    f_u_0 = f(t_vals[0], u_0_array)
 
-    a_vals = dict()
-    b_vals = dict()
+    a_vals, b_vals = {}, {}
 
     d = len(u_0)
 
@@ -21,7 +19,7 @@ def ivp_diethelm(f, u_0, alpha_vals, T, dt):
         alpha_vals = np.ones(d)*alpha_vals
     elif np.array(alpha_vals).size != d:
         print("ERROR! Either give one alpha or d (dimensions) alpha's!")
-        return False
+        assert 0
 
     for alpha in alpha_vals:
         b_vals[alpha] = np.zeros(N+1)
@@ -41,19 +39,21 @@ def ivp_diethelm(f, u_0, alpha_vals, T, dt):
             b = b_vals[alpha]
             a = a_vals[alpha]
 
-            p[dim] = u_0[dim] + h**alpha / gamma(alpha+1) * np.flip(b[1:j+1]) @ f_prev_vals[:, dim]
+            p[dim] = u_0[dim] + h**alpha / gamma(alpha+1) * np.flip(b[1:(j+1)]) @ f_prev_vals[:, dim]
         
         f_pred_vals = f(t_vals[j], np.array([p]))
+        f_pred_vals = np.reshape(f_pred_vals, [f_pred_vals.shape[0], d])
         for dim in range(d):
             alpha = alpha_vals[dim]
             b = b_vals[alpha]
             a = a_vals[alpha]
 
             # breakpoint()
+
             y[j, dim] = u_0[dim] + h**alpha / gamma(alpha+2) * (
-                f_pred_vals[:, dim] + ((j-1)**(alpha+1)-(j-1-alpha)*j**alpha)*f_u_0[:, dim]
+                f_pred_vals[:, dim] + ((j-1)**(alpha+1)-(j-1-alpha)*j**alpha)*f_u_0.T[dim]
                 +
-                np.flip(a[2:j+1]) @ f_prev_vals[1:, dim]
+                np.flip(a[2:(j+1)]) @ f_prev_vals[1:, dim]
             )
 
     return y
@@ -62,7 +62,7 @@ def sin_I_a(t, alpha, omega):
     # Computes the fractional integral from 0 to t of sin(omega * t)
     # NOTE: t has to be scalar since mpmath.hyp1f2 does not accept vectors
     # If it looks messy: it is. Obtained from Laplace transforming
-    # However, quite battle tested as of now, works well and not even too slow
+    # However, quite battle tested as of now, works well and not even too slow!:)
 
     if alpha == 0:
         # To speed up the process for nonfractional case 

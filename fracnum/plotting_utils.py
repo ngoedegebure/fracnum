@@ -2,6 +2,8 @@ import warnings
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.cm as cm
+import matplotlib as mpl
 
 from scipy.fft import fft, fftfreq
 from scipy.signal.windows import blackman
@@ -93,10 +95,13 @@ def truncate_colormap(cmap, minval=0.2, maxval=0.8, n=100):
         cmap(np.linspace(minval, maxval, n)))
     return new_cmap
 
-def get_lin_line_colors(N_x, cmap_name = 'magma', cmap_trunc = [0.15, 0.78]):
+def get_lin_line_colors(x, cmap_name = 'magma_r', cmap_trunc = [0.2, 0.8]):
+    N_x = len(x)
     cmap = mpl.colormaps[cmap_name]
-    colors = cmap(np.linspace(cmap_trunc[0], cmap_trunc[1], N_x))
-    return colors
+    cmap = truncate_colormap(cmap, minval = cmap_trunc[0], maxval =  cmap_trunc[1])
+    colors = cmap(np.linspace(0,1, N_x))
+
+    return colors, cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=np.min(x), vmax=np.max(x)), cmap=cmap)
 
 class VdP_Plotter():
     def __init__(self, x, xder, t, params, alpha, dt, T, n_eval, comp_time, forcing_params = None, lims_override = None, cmap_name="magma_r", cmap_trunc = [0.15, 0.75]):
