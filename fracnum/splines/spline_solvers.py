@@ -20,7 +20,7 @@ class SplineSolver():
         # Get beta for all dimensions
         self.beta = SplineSolver.parse_alpha(beta_vals, self.d) 
         self.gamma = self.alpha + self.beta - self.alpha*self.beta
-        breakpoint()
+        # breakpoint()
         # Build forcing values
         self.forcing_vals = self.build_forcing_values(forcing_parameters)
         # Initialize x storage values
