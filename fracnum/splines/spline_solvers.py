@@ -4,6 +4,7 @@ import numpy as np
 from scipy.special import gamma
 import time
 from tqdm import tqdm
+import copy
 
 class SplineSolver():
     # Solver method for boundary and initial value problems (BVP and IVP's)
@@ -19,8 +20,12 @@ class SplineSolver():
         self.alpha = SplineSolver.parse_alpha(alpha_vals, self.d) 
         # Get beta for all dimensions
         self.beta = SplineSolver.parse_alpha(beta_vals, self.d) 
+        # Gamma Hilfer parameter
         self.gamma = self.alpha + self.beta - self.alpha*self.beta
-        # breakpoint()
+        # Not hilfer if gamma = 1 (hence Caputo)
+        self.hilfer = (not np.all(self.gamma == 1))
+        if self.hilfer:
+            self.hilfer_vals = self.build_hilfer_values(self.gamma)
         # Build forcing values
         self.forcing_vals = self.build_forcing_values(forcing_parameters)
         # Initialize x storage values
@@ -80,6 +85,14 @@ class SplineSolver():
 
         return forcing_vals
     
+    def build_hilfer_values(self, gamma_vals, shift_t_0 = 0):
+        hilfer_vals = [np.array([0], dtype='float64')] * self.d
+        t_vals = copy.copy(self.bs.t_eval_vals_ord)
+        t_vals[0, 0] = self.bs.t_eval_vals_ord[0,0] + shift_t_0
+        for dim in range(self.d):
+            hilfer_vals[dim] = t_vals**(gamma_vals[dim]-1)/gamma(gamma_vals[dim])
+        return hilfer_vals
+
     def get_initial_x(self,save_x):
         # In this method, either an initial x is taken from storage or built from initial values
         # Mostly useful for the global solution method, where a good initial guess is important
@@ -187,7 +200,11 @@ class SplineSolver():
                     # Get I^alpha { f(t_M, x_M) }
                     int_vals = self.bs.I_a(f_a_vals_tot[k, i_knot, :], alpha = self.alpha[k], knot_sel = ('at', i_knot))
                     # x_{M,j+1} = x_0 + _0I_t^alpha f(t_{M, j}, x_{M, j})
-                    x[k, i_knot, :] = self.x_0[k] + int_vals_base[k, :] + int_vals
+                    if self.hilfer:
+                        ic_part = self.hilfer_vals[k][i_knot, :] 
+                    else:
+                        ic_part = self.x_0[k] 
+                    x[k, i_knot, :] = ic_part + int_vals_base[k, :] + int_vals
                     # Add forcing values if selected
                     if np.array(self.forcing_vals[k]).size > 1:
                         x[k, i_knot, :] += self.forcing_vals[k][i_knot, :]
@@ -232,7 +249,13 @@ class SplineSolver():
                 # Get _0I^alpha_t f(x,t) for all t_eval
                 int_vals = self.bs.I_a(f_a_vals[k, :, :], alpha = self.alpha[k])
                 # x = x_0 + _0I_t^alpha f(x,t)
-                x[k, :, :] = self.x_0[k] + int_vals
+
+                if self.hilfer:
+                    ic_part = self.hilfer_vals[k]
+                else:
+                    ic_part = self.x_0[k] 
+
+                x[k, :, :] = ic_part + int_vals
 
                 if np.array(self.forcing_vals[k]).size > 1:
                     if bvp:
@@ -244,9 +267,14 @@ class SplineSolver():
 
                 if bvp:
                     # Get delta computation
-                    delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
+                    # if self.hilfer:
+                    prefix = (gamma(1-self.gamma[k]+self.alpha[k])/gamma(self.alpha[k])) * ((1-self.gamma[k])/self.alpha[k] + 1)*T**(self.gamma[k]-1) * (self.bs.t_eval_vals_ord/T)**self.alpha[k]
+                    delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])
+                    # else:
+                    #     prefix = (self.bs.t_eval_vals_ord/T)**self.alpha[k]
+                    #     delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
                     # Substract integrated delta for BVP requirement
-                    x[k, :, :] -= (self.bs.t_eval_vals_ord/T)**self.alpha[k] * delta[k]
+                    x[k, :, :] -= prefix* delta[k]
 
             # Compute the iteration norm increment
             it_norm = SplineSolver.it_norm(x, x_prev, norm)
@@ -265,6 +293,9 @@ class SplineSolver():
             # Notify if max iterations is reached
             if n_tot_it == (conv_max_it - 1):
                 print(f"WARNING: max iterations ({conv_max_it}) reached on one knot, increment norm {it_norm}")
+
+        bvp_test = self.bs.I_a_scalar(T, x[0, :, :], 1-self.gamma[0])
+        print('bvp_test, _0I^(gamma-1)_T x(t) = ', bvp_test)
 
         return x, f_a_vals, n_tot_it, it_norm
 

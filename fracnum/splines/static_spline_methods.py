@@ -5,10 +5,26 @@ import numpy as np
 
 class SplineMethods:
     @staticmethod
-    def build_total_t_vals(t_knot_vals, n):
+    def build_total_t_vals(t_knot_vals, n, magnify = None):
         # Builds the coefficient t values for chosen knots and polynomial order
         # Returns both ordered per knot (first element) and a vector of all values (second element) 
 
+        if magnify is not None:
+            knot_index, n_mag = magnify
+            i_a, i_b = knot_index, knot_index+1
+            t_a, t_b = t_knot_vals[i_a], t_knot_vals[i_b]
+
+            # breakpoint()
+            new_magnified_vals = np.linspace(t_a, t_b, n_mag+1)
+
+            new_t_knot_vals = np.concatenate([
+                t_knot_vals[(np.arange(len(t_knot_vals)) < i_a)],
+                new_magnified_vals[:-1],
+                t_knot_vals[(np.arange(len(t_knot_vals)) > i_a)]
+            ])
+            
+            t_knot_vals = new_t_knot_vals
+            # print(f'magnified knot {knot_index}, ', new_magnified_vals)
         total_t_vals_ord = np.zeros([len(t_knot_vals)-1, n+1]) # Initialize the total t values
 
         for i in range(len(t_knot_vals)-1): 
