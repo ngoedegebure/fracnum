@@ -4,18 +4,18 @@ from .static_bernstein_methods import BernsteinMethods
 from .spline_solvers import SplineSolver
 
 class BernsteinSplines:
-    def __init__(self, t_knot_vals, n, n_eval = None, alpha_init = None, silent_mode = False):        
+    def __init__(self, t_knot_vals, n, n_eval = None, alpha_init = None, silent_mode = False, magnify = None):        
         self.t_knot_vals = t_knot_vals  # Knot values t_0, t_1, t_2 ... t_k
         self.h = np.diff(t_knot_vals)   # Knot sizes h_0 ... h_{k-1}
         self.n = n                      # Polynomial calculation order
 
         # Get calculation t values
-        self.t_calc_vals_ord, self.t_calc_vals_list = SplineMethods.build_total_t_vals(t_knot_vals, n)
+        self.t_calc_vals_ord, self.t_calc_vals_list = SplineMethods.build_total_t_vals(t_knot_vals, n, magnify= magnify)
 
         if n_eval is not None:
             # If a different evaluation order is specied, use this order and build t vals accordingly
             self.n_eval = n_eval
-            self.t_eval_vals_ord, self.t_eval_vals_list = SplineMethods.build_total_t_vals(t_knot_vals, n_eval)
+            self.t_eval_vals_ord, self.t_eval_vals_list = SplineMethods.build_total_t_vals(t_knot_vals, n_eval,  magnify= magnify)
         else:
             # If not, take both as n and use calculation t values
             self.n_eval = n
