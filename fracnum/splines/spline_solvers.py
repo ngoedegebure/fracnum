@@ -26,7 +26,6 @@ class SplineSolver():
         self.hilfer = (not np.all(self.gamma == 1))
         if self.hilfer:
             self.hilfer_vals = self.build_hilfer_values(self.gamma)
-        # breakpoint()
         # Build forcing values
         self.forcing_vals = self.build_forcing_values(forcing_parameters)
         # Initialize x storage values
