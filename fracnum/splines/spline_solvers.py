@@ -156,7 +156,7 @@ class SplineSolver():
         f_a_vals_tot = np.zeros([self.d, N_knots, n_calc]) # Initialize the function value storage
         n_tot_it = 0 # Initialize total iteration counter
 
-        for i_knot in tqdm(range(N_knots), desc='Iterating IVP for knots', disable = (not verbose)):
+        for i_knot in tqdm(range(N_knots), desc='Iterating IVP for knots', disable = False):
             # Initialize the integral values for this knot
             int_vals_base = np.zeros([self.d, n_eval])
             if i_knot > 0:
@@ -280,7 +280,7 @@ class SplineSolver():
             verbose = False):
         
         # Makes sure the integral basis is ready
-        self.bs.build_and_save_integral_basis(self.alpha, verbose= verbose)
+        self.bs.build_and_save_integral_basis(self.alpha, verbose= True)
         # Gets initial value for x
         x = self.get_initial_x(save_x)
 
