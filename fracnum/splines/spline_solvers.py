@@ -23,7 +23,7 @@ class SplineSolver():
         # Gamma Hilfer parameter
         self.gamma = self.alpha + self.beta - self.alpha*self.beta
         # Not hilfer if gamma = 1 (hence Caputo)
-        self.hilfer = (not np.all(self.gamma == 1))
+        self.hilfer = (not np.all(self.beta == 1))
         if self.hilfer:
             self.hilfer_vals = self.build_hilfer_values(self.gamma)
         # Build forcing values
