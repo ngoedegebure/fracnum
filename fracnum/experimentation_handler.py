@@ -1,7 +1,7 @@
 import numpy as np
-import xarray as xr
-import copy
 import itertools
+import copy
+from .data_utils import DataHandler
 
 class ExperimentationHandler():
     def __init__(self, bs, f_object, vary_params, alpha_fun = None):
@@ -35,8 +35,9 @@ class ExperimentationHandler():
                 # If bounds passed to make linear step size space
                 a, b = vary_dict[key]['bounds']
                 step_size = vary_dict[key]['step_size']
-                N = int(np.abs(b-a)/step_size) + 1
+                N = int(np.round(np.abs(b-a)/step_size,0)) + 1
                 space_dict[key] = np.linspace(a, b, N)
+                # breakpoint()
 
         return space_dict
     
@@ -67,85 +68,9 @@ class ExperimentationHandler():
 
         return self.alpha_fun(alpha), x_0, params, forcing_params
     
-    @staticmethod
-    def parse_storage(storage_settings):
-        save_ts, save_ts_der = [0], [0] # defaults: save first dimension and its derivative
-        if storage_settings is not None:
-            if 'save_ts' in storage_settings.keys():
-                save_ts = storage_settings['save_ts']
-            if 'save_ts_der' in storage_settings.keys():
-                save_ts_der = storage_settings['save_ts_der']
-        return save_ts, save_ts_der
-
-    @staticmethod
-    def initialize_ds(storage_settings, param_space, t_vals):
-        t_key = 't'
-        x_comp_string = "x_component"
-
-        save_ts, save_ts_der = ExperimentationHandler.parse_storage(storage_settings)
-                
-        x_names = [f"x{i}" for i in save_ts]
-        [x_names.append(f"x{i}_der") for i in save_ts_der]
-        n_x = len(x_names)
-
-        full_keys = copy.copy(list(param_space.keys()))
-        full_keys.append(t_key)
-        full_keys.append(x_comp_string)
-
-        full_size = [len(param) for param in list(param_space.values())]
-        full_size.append(len(t_vals))
-        full_size.append(n_x)
-
-        coord_dict = copy.copy(param_space)
-        coord_dict[t_key] = t_vals
-        coord_dict[x_comp_string] = x_names
-        ds = xr.Dataset({"x": (full_keys, np.zeros(full_size))},
-            coords = coord_dict
-        )
-        
-        return ds
-    
-    @staticmethod
-    def update_ds(ds, results, param_names, param_vals, storage_settings):
-        x = results['x']
-
-        save_ts, save_ts_der = ExperimentationHandler.parse_storage(storage_settings)
-
-        indices = {}
-        for i in range(len(param_names)):
-            indices[param_names[i]] = param_vals[i]
-
-        i_x = 0
-        for i_ts in save_ts:
-            # All the values to save normally
-            x_select = x[:, i_ts]
-
-            indices['x_component'] = f"x{i_ts}"
-            slices = [indices.get(dim, slice(None)) for dim in ds.dims]
-
-            ds['x'].loc[tuple(slices)] = x_select
-            i_x+=1
-        
-        for i_ts in save_ts_der:
-            # All the values to save normally
-            x_select = x[:, i_ts]
-
-            indices['x_component'] = f"x{i_ts}_der"
-            slices = [indices.get(dim, slice(None)) for dim in ds.dims]
-
-            der_vals = np.squeeze(np.diff(x_select)/np.diff(results['t']))
-            ds['x'].loc[tuple(slices)] = np.append(der_vals, float('nan'))
-            i_x+=1
-
-        if 'path' in storage_settings.keys() and 'autosave' in storage_settings.keys():
-            if storage_settings['autosave'] is True:
-                ds.to_netcdf(storage_settings['path'])
-
-        return ds
-    
     def run_experiment(self, storage_settings = None, verbose = True):
-        ds = ExperimentationHandler.initialize_ds(storage_settings, self.param_space, self.bs.t_eval_vals_list)
-        print(ds)
+        data_obj = DataHandler(storage_settings, self.param_space, self.bs.t_eval_vals_list)
+        
         param_space_vals = list(self.param_space.values())
 
         param_names = list(self.param_space.keys())
@@ -174,9 +99,11 @@ class ExperimentationHandler():
             # TODO: add kwargs here
             results = solver.run()
 
-            ds = ExperimentationHandler.update_ds(ds, results, param_names, new_inputs, storage_settings)
+            # ds = ExperimentationHandler.update_ds(ds, results, param_names, new_inputs, storage_settings)
+            data_obj.update_ds(new_inputs, results)
 
             i_run += 1
 
-        if 'path' in storage_settings.keys():
-            ds.to_netcdf(storage_settings['path'])
+        data_obj.store_if_needed()
+
+        return data_obj.ds
