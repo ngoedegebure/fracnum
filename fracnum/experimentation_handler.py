@@ -41,7 +41,7 @@ class ExperimentationHandler():
 
         return space_dict
     
-    def set_defaults(self, alpha = None, x_0 = None, params = None, forcing_params = None):
+    def set_defaults(self, alpha = None, x_0 = None, params = {}, forcing_params = {}):
         self.default_alpha = alpha
         self.default_x_0 = x_0
         self.default_params = params
