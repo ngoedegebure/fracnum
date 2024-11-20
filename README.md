@@ -9,13 +9,13 @@ More documentation, examples and features will be added later. For now, the exam
 ## Installation Windows:
 
 ```
-python -m venv .venv ; ".venv/Scripts/activate.bat" ; python -m pip install .
+python -m venv .venv ; ".venv/Scripts/activate.bat" ; python -m pip install -e .
 ```
 
 ## Installation Linux:
 
 ```
-python -m venv .venv ; source .venv/bin/activate ; python -m pip install .
+python -m venv .venv ; source .venv/bin/activate ; python -m pip install -e .
 ```
 
 ## Example file for pretty pictures:

@@ -5,3 +5,5 @@ experiments
 figures_dump
 data_dump
 notebooks
+results/
+examples/VdP/niels
