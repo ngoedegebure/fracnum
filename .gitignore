@@ -1,9 +1,10 @@
 .venv/
+build
 fracnum.egg-info/
 __pycache__/
 experiments
 figures_dump
 data_dump
 notebooks
-results/
+results
 examples/VdP/niels
