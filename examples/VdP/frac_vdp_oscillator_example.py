@@ -21,7 +21,7 @@ Where D represents the Caputo derivative of order alpha. Enjoy the stability and
 ######################
 
 alpha_damping = 0.8     # Fractional order of damping
-beta = 0.5              # Hilfer Beta
+beta = 1             # Hilfer Beta
 
 params = {
     'mu': 1     # mu parameter of VdP oscillator
@@ -44,7 +44,7 @@ VdP_bs = fr.ode_functions.VdP(params, bernstein = True, transpose = False)
 ###################
 
 ### Knot input values ###
-T = np.pi*10           # Integration max time
+T = 50           # Integration max time
 eps = 10**(-15)         # Time shift epsilon, start of interval
 dt = 0.05               # Spline size (also called h) though varying size can also be used by creating a custom t_knot_vals
 c = 3/2                 # Knot size increase constant
@@ -95,7 +95,7 @@ x_der = np.diff(x)/np.diff(t) # Calculate the derivative of x
 # Plotting #
 ############
 
-skip_n_vals = 10 # Skip first n vals in case of Hilfer derivative for plotting
+skip_n_vals = 20 # Skip first n vals in case of Hilfer derivative for plotting
 if np.all(beta == 1) :
     skip_n_vals = 0
 
