@@ -8,11 +8,12 @@ from fracnum.numerical import build_hilf_knot_vals
 """
 Example file of using Bernstein splines for time-integrating the (forced) fractional Van der Pol oscillator in the sense:
 
-x'' - mu * (1 - x^2) * D^alpha x + x = A * sin(omega * t)
+x'' - mu * (1 - x^2) * D^{alpha, \beta} x + x = A * sin(omega * t)
 
-Where D represents the Caputo derivative of order alpha. Enjoy the stability and (quasi-)chaos!
+Where D represents the Hilfer derivative of order alpha and type beta.
+Enjoy the stability, quasiperiodicity and chaos!
 
-- Niels Goedegebure, 29 October 2024
+- Niels Goedegebure, March 5, 2025
 
 """
 
