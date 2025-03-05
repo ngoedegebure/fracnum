@@ -22,7 +22,7 @@ Enjoy the stability, quasiperiodicity and chaos!
 ######################
 
 alpha_damping = 0.8     # Fractional order of damping
-beta = 1             # Hilfer Beta
+beta = 0.5              # Hilfer Beta
 
 params = {
     'mu': 1     # mu parameter of VdP oscillator
