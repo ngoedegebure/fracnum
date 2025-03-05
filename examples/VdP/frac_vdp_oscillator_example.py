@@ -3,7 +3,7 @@ import fracnum as fr
 
 from fracnum.splines import BernsteinSplines
 from fracnum.plotting_utils import VdP_Plotter
-
+from fracnum.numerical import build_hilf_knot_vals
 
 """
 Example file of using Bernstein splines for time-integrating the (forced) fractional Van der Pol oscillator in the sense:
@@ -21,6 +21,7 @@ Where D represents the Caputo derivative of order alpha. Enjoy the stability and
 ######################
 
 alpha_damping = 0.8     # Fractional order of damping
+beta = 0.5              # Hilfer Beta
 
 params = {
     'mu': 1     # mu parameter of VdP oscillator
@@ -29,8 +30,8 @@ params = {
 # Forcing is a list of dictionaries applying A*sin(omega*t) + c to solution component dim (1 gives y in this case)
 forcing_params = [{
     'dim' : 1,
-    'A' : 3,
-    'omega' : 2,
+    'A' : 3, #3
+    'omega' : 3.3,#1.94,#4.0,#6.2,
     'c' : 0
 }]
 
@@ -42,17 +43,24 @@ VdP_bs = fr.ode_functions.VdP(params, bernstein = True, transpose = False)
 # Spline settings #
 ###################
 
-T = 200                 # Integration max time
+### Knot input values ###
+T = np.pi*10           # Integration max time
+eps = 10**(-15)         # Time shift epsilon, start of interval
 dt = 0.05               # Spline size (also called h) though varying size can also be used by creating a custom t_knot_vals
-N_knot_int = int(T/dt)  # Number of knots
-n_eval = 1              # Polynomial order. NOTE: when taking the spline derivative as done below, it is beneficial to keep this at 1 for plotting / spline cont. diff reasons
+c = 3/2                 # Knot size increase constant
+##
+
+gamm = alpha_damping + beta - alpha_damping*beta # Hilfer gamma parametrization
+
+t_knot_vals = build_hilf_knot_vals(eps, T, c, gamm, dt) # np.linspace(0, T, N_knot_int+1)  # Initialize equidistant knot values [t_0, t_1, t_2 ... t_k]. Can be generalized to anything.
 
 ####
+
+n_eval = 1 # Polynomial order
+
 # A bit of a technicality: the order of the polynomial goes up by 3 since it gets multiplied 3 times in the VdP system equation.
 # In general equal to m * n_eval, where m denotes the highest order of multiplication in x-components of f(x)
 n_calc = VdP_bs.N_upscale * n_eval
-
-t_knot_vals = np.linspace(0, T, N_knot_int+1)  # Initialize equidistant knot values [t_0, t_1, t_2 ... t_k]. Can be generalized to anything.
 
 bs = BernsteinSplines(t_knot_vals, n_calc, n_eval=n_eval)  # Initialize splines setup!
 
@@ -66,32 +74,34 @@ VdP_bs.set_bs_mult_upscale_functions(mult, upscale)
 ############
 
 # Initial value (x, y).
-# NOTE: for now, keep y to zero so that the derivative calculation still applies without need for a constant
 x_0 = np.array([2, 0])
 
 # alpha for x and y component separately. For reference, see https://doi.org/10.1016/j.chaos.2006.05.010
 system_alpha_vals = [alpha_damping, 2-alpha_damping]    
 # Initialize the solving structure
-spline_solver = bs.initialize_solver(VdP_bs.f, x_0, system_alpha_vals, forcing_params = forcing_params) 
+spline_solver = bs.initialize_solver(VdP_bs.f, x_0, system_alpha_vals, beta_vals = beta, forcing_params = forcing_params) 
 # Run the solver. method = 'local' uses knot-by-knot integration, method = 'global' at-large interval integration.
-results = spline_solver.run(method='local', verbose = False)
+results = spline_solver.run(method='local', verbose = False, t_eval=t_knot_vals)
 
 # Save some results...
-x = results['x']                      # Function at evaluation points as vector
+x = results['x'][0]                   # Function at evaluation points as vector
 a_vals = results['a']                 # Splines coefficients in matrix form
 comp_time = results['total_time']     # Total computational time
 t = results['t']                      # Knot time values
 
-x_der = bs.ddt(a_vals[0, :, :], upscale = True) # Calculate the derivative of x
+x_der = np.diff(x)/np.diff(t) # Calculate the derivative of x
 
 ############
 # Plotting #
 ############
 
-# Last value is discarded for the derivative calculation
-plot_x = x[:-1, 0]
-plot_x_der = x_der[:-1]
-plot_t = t[:-1]
+skip_n_vals = 10 # Skip first n vals in case of Hilfer derivative for plotting
+if np.all(beta == 1) :
+    skip_n_vals = 0
+
+plot_x = x[skip_n_vals:-1] # Last value is discarded for the derivative calculation
+plot_x_der = x_der[skip_n_vals:]
+plot_t = t[skip_n_vals:-1]
 
 # If provided, can be used to keep fixed limits for the frame. Currently not inputted below.
 lims_override = {
@@ -111,18 +121,18 @@ plot_object = VdP_Plotter(
     n_eval, 
     comp_time, 
     forcing_params=forcing_params, 
-    lims_override = None
+    lims_override = None,
+    beta = beta
 )
 
 plot_object.phase()
-plot_object.signal(hd_aspect=True)
+plot_object.phase(empty = True)
 plot_object.threedee()
 plot_object.fourier_spectrum()
 plot_object.phase_fourier()
 
 plot_object.show_plots()
 
-breakpoint()
 ############
 # Enjoy!:) #
 ############

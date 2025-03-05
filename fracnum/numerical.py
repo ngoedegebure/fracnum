@@ -95,3 +95,17 @@ def I_rl_rect_left(alpha_int, t_vals_int):
     J = J*1/gamma(alpha_int)
 
     return J
+
+def build_hilf_knot_vals(eps, T, c, gamm, h_max):
+    if gamm == 1:
+        return np.linspace(0, T, int(T/h_max)+1)
+    t_vals = np.array([eps])
+    t = eps
+    while t < T:
+        h = (c**(1/(1-gamm))-1)*t
+        if h < h_max:
+            t = t + h
+        else:
+            t = t+ h_max
+        t_vals = np.append(t_vals, t)
+    return t_vals

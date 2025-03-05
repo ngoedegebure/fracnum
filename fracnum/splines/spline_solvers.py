@@ -1,4 +1,5 @@
 from .static_spline_methods import SplineMethods
+from .static_bernstein_methods import BernsteinMethods
 from fracnum.numerical import sin_I_a
 import numpy as np
 from scipy.special import gamma
@@ -110,15 +111,25 @@ class SplineSolver():
 
         return x
 
-    def build_results_dict(self, x, n_tot_it, norm,it_norm, total_time, f_0, T = None, delta = None):
+    def build_results_dict(self, x, n_tot_it, norm,it_norm, total_time, f_0, T = None, delta = None, t_eval = None):
         # TODO: maybe change this to an object or xr / pandas?
         # For now: creates a dictionary of main results
 
         N_knots = x[0, :, :].shape[0] # SSOT: can be computed from x
+        if t_eval is not None:
+            x_vals = np.array([
+                # SplineMethods.a_to_vector(x[i, :, :])
+                t_eval**(self.gamma[i]-1)*\
+                BernsteinMethods.eval_t(x[i, :, :], self.bs.t_knot_vals, t_eval, der= False)
+                  for i in range(self.d)
+                ])
+        else:
+            x_vals = np.array([SplineMethods.a_to_vector(x[i, :, :]) for i in range(self.d)]).T, #TODO: transpose? CHECK!
+
         output_dict = {
             't': self.bs.t_eval_vals_list,
             # Below looks a bit confusing, but the logic is: a is the ordered coefficients and x the "flat" evaluation
-            'x': np.array([SplineMethods.a_to_vector(x[i, :, :]) for i in range(self.d)]).T, #TODO: transpose? CHECK!
+            'x': x_vals,
             'a': x, 
             'norm_type':norm,
             'norm_value':it_norm,
@@ -159,7 +170,7 @@ class SplineSolver():
         # Summary of selected results per knot
         print(f"~ {res['n_it_per_knot']:.2f} it/knot avg., {res['time_per_knot']:.6f} s/knot avg.")
 
-    def iterate_local(self, x, conv_tol, conv_max_it, div_treshold, norm, verbose):
+    def iterate_local(self, x, conv_tol, conv_max_it, div_treshold, norm, verbose, new_hilf = True):
         ### "Local" iteration iterates knot-for knot ###
 
         N_knots = self.bs.t_eval_vals_ord.shape[0] # Number of knots
@@ -181,7 +192,8 @@ class SplineSolver():
                 for k in range(self.d):
                     # Int_vals_base keeps track of the influence of the integral of all previous knots
                     # Hence, will not change in the next steps
-                    int_vals_base[k, :] = self.bs.I_a(f_no_last[k, :, :], alpha = self.alpha[k], knot_sel = ('to', i_knot))
+                    if self.alpha[k] != 0:
+                        int_vals_base[k, :] = self.bs.I_a(f_no_last[k, :, :], alpha = self.alpha[k], knot_sel = ('to', i_knot))
 
                     # EXPERIMENT!
                     # Take the previous knot's final value as an initial guess for the to-be-calculated one
@@ -193,18 +205,31 @@ class SplineSolver():
                 x_prev = x.copy() # Saves previous estimate for convergence statistics
 
                 # Compute function values f(t_M, x_M)
-                f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_eval_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :])
+                if self.hilfer and new_hilf:
+                    t_gamma_vals = np.zeros([self.d, 1, n_eval])
+                    for k in range(self.d):
+                        t_gamma_vals[k, :, :] = self.bs.t_eval_vals_ord[i_knot, :]**(self.gamma[k]-1)
 
+                    # breakpoint()
+                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_eval_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :] * t_gamma_vals)
+                else:
+                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_eval_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :])
+                    
                 ### Compute integration for each element ###
                 for k in range(self.d):
                     # Get I^alpha { f(t_M, x_M) }
                     int_vals = self.bs.I_a(f_a_vals_tot[k, i_knot, :], alpha = self.alpha[k], knot_sel = ('at', i_knot))
                     # x_{M,j+1} = x_0 + _0I_t^alpha f(t_{M, j}, x_{M, j})
                     if self.hilfer:
-                        ic_part = self.hilfer_vals[k][i_knot, :] 
+                        if new_hilf: # NEW:
+                            ic_part = self.x_0[k]/gamma(self.gamma[k])
+                            x[k, i_knot, :] = ic_part + self.bs.t_eval_vals_ord[i_knot, :]**(1-self.gamma[k])*( int_vals_base[k, :] + int_vals )
+                        else: # OLD:
+                            ic_part = self.x_0[k] * self.hilfer_vals[k][i_knot, :]  
+                            x[k, i_knot, :] = ic_part + int_vals_base[k, :] + int_vals
                     else:
                         ic_part = self.x_0[k] 
-                    x[k, i_knot, :] = ic_part + int_vals_base[k, :] + int_vals
+                        x[k, i_knot, :] = ic_part + int_vals_base[k, :] + int_vals
                     # Add forcing values if selected
                     if np.array(self.forcing_vals[k]).size > 1:
                         x[k, i_knot, :] += self.forcing_vals[k][i_knot, :]
@@ -229,7 +254,11 @@ class SplineSolver():
                 # Notify if max iterations is reached
                 if conv_it == (conv_max_it - 1):
                     print(f"WARNING: max iterations ({conv_max_it}) reached on one knot, increment norm {it_norm}")
-
+        # NEW HILFER!
+        #### 2025-02-27 tried not to do this and instead just do afterwards at eval ####
+        # if self.hilfer and new_hilf:
+        #     for k in range(self.d):
+        #         x[k, :, :] = x[k, :, :] * self.bs.t_eval_vals_ord**(self.gamma[k]-1)
         return x, f_a_vals_tot, n_tot_it, it_norm
     
     def iterate_global(self, x, conv_tol, conv_max_it, div_treshold, norm, verbose, bvp = None, T = None):
@@ -294,12 +323,14 @@ class SplineSolver():
             if n_tot_it == (conv_max_it - 1):
                 print(f"WARNING: max iterations ({conv_max_it}) reached on one knot, increment norm {it_norm}")
 
-        bvp_test = self.bs.I_a_scalar(T, x[0, :, :], 1-self.gamma[0])
-        print('bvp_test, _0I^(gamma-1)_T x(t) = ', bvp_test)
+        if (1-self.gamma[0]) != 0:
+            bvp_test = self.bs.I_a_scalar(T, x[0, :, :], 1-self.gamma[0])
+            print('bvp_test, _0I^(gamma-1)_T x(t) = ', bvp_test)
 
         return x, f_a_vals, n_tot_it, it_norm
 
     def run(self, 
+            t_eval = None,
             method='local', 
             bvp = False, 
             T = None, 
@@ -339,7 +370,9 @@ class SplineSolver():
         # Gets the value for f_0. Can be useful for checking and period selection (e.g. y'(0)=0)
         f_0 = f_a_vals[:, 0, 0] 
         # Build all results here
-        result_dict = self.build_results_dict(x_sol, n_tot_it,norm, it_norm, total_time, f_0, T = T, delta = delta)
+        result_dict = self.build_results_dict(
+            x_sol, n_tot_it,norm, it_norm, total_time, f_0, T = T, delta = delta, t_eval = t_eval
+        )
         # Get a nice human-readable summary of run time statistics
         if verbose:
             SplineSolver.print_summary(result_dict)        

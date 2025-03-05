@@ -15,7 +15,7 @@ from matplotlib.collections import LineCollection
 
 from matplotlib import rc
 
-mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["lightseagreen", "orange", "limegreen"]) 
+mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["lightseagreen", "orange", "darkmagenta", "dodgerblue"]) 
 
 font_families = ['Segoe UI', 'Arial', 'Helvetica']
 rc('font',**{'family':'sans-serif','sans-serif':font_families})
@@ -104,7 +104,7 @@ def get_lin_line_colors(x, cmap_name = 'magma_r', cmap_trunc = [0.2, 0.8]):
     return colors, cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=np.min(x), vmax=np.max(x)), cmap=cmap)
 
 class VdP_Plotter():
-    def __init__(self, x, xder, t, params, alpha, dt, T, n_eval, comp_time, forcing_params = None, lims_override = None, cmap_name="magma_r", cmap_trunc = [0.15, 0.75]):
+    def __init__(self, x, xder, t, params, alpha, dt, T, n_eval, comp_time, forcing_params = None, lims_override = None, cmap_name="magma_r", cmap_trunc = [0.15, 0.75], beta = 1):
         self.x = x
         self.xder = xder
         self.t = t
@@ -114,8 +114,11 @@ class VdP_Plotter():
         self.T = T
         self.n_eval = n_eval
         self.comp_time = comp_time
-        self.forcing_params = forcing_params[0] # Take just the first element in this case. Can be made more general
-
+        if forcing_params is not None:
+            self.forcing_params = forcing_params[0] # Take just the first element in this case. Can be made more general
+        else:
+            self.forcing_params = None
+        self.beta = beta
         self.cmap_name = cmap_name
         self.cmap_trunc = cmap_trunc
 
@@ -160,7 +163,7 @@ class VdP_Plotter():
             fractional_settings_string = ""
             fractional_string = ""
         else:
-            fractional_settings_string = r"\alpha="+str(self.alpha)+r", "
+            fractional_settings_string = rf"\alpha={ self.alpha}, \beta = {self.beta},"
             
         if self.params['mu'] == 0:
             # If mu = 0, the damping alpha does not affect anything
@@ -207,7 +210,7 @@ class VdP_Plotter():
             label_text = ax_phase.text(0.88, 0.075, add_text, transform=ax_phase.transAxes)
 
         if save_filepath is not None:
-            plt.savefig(save_filepath, dpi=300)
+            plt.savefig(save_filepath, dpi=400)
 
         return ax_phase
 
@@ -284,15 +287,22 @@ class VdP_Plotter():
         if save_filepath is not None:
             plt.savefig(save_filepath, dpi = 300)
 
-    def phase_fourier(self, save_filepath=None):
-        grid = [
-            ['phase', 'fourier_x'],
-            ['phase', 'fourier_xder']
-        ]
+    def phase_fourier(self, save_filepath=None, x_signal = True, t_cutoff = 100):
+        if not x_signal:
+            grid = [
+                ['phase', 'fourier_x'],
+                ['phase', 'fourier_xder']
+            ]
+            title_string = "\nPhase portrait and fourier spectrum of " + self.title + "\n" + self.param_desciption
+        else:
+            grid = [
+                ['phase', 'x_signal'],
+                ['phase', 'fourier_x']
+            ]
+            title_string = "\nPhase portrait, signal and fourier spectrum of " + self.title + "\n" + self.param_desciption
         
         fig, axs = plt.subplot_mosaic(grid, figsize = self.hd_size, layout="constrained")
-
-        plt.suptitle("\nPhase portrait and fourier spectrum " + self.title + "\n" + self.param_desciption)
+        plt.suptitle(title_string)
 
         # TODO: MAKE MODULAR!
         # PHASE #
@@ -313,7 +323,9 @@ class VdP_Plotter():
 
         # Fourier #
 
-        f_x, f_xder = fft(self.x), fft(self.xder)
+        f_x = fft(self.x)
+        if not x_signal:
+            f_xder = fft(self.xder)
 
         N = len(self.x)
         T_samplespacing = self.T/(N)*(1/(2*np.pi))
@@ -328,19 +340,39 @@ class VdP_Plotter():
             omega = self.forcing_params['omega']
             axs['fourier_x'].axvline(x = omega, color = 'red', linestyle = '--', linewidth = 1.5, label = 'Forcing')
             axs['fourier_x'].legend()
-            axs['fourier_xder'].axvline(x = omega, color = 'red', linestyle = '--', linewidth = 1.5)
+            if not x_signal:
+                axs['fourier_xder'].axvline(x = omega, color = 'red', linestyle = '--', linewidth = 1.5)
 
         axs['fourier_x'].plot(xf[1:N//select_div], 2.0/N * np.abs(f_x[1:N//select_div]))
         axs['fourier_x'].set(ylabel=r"$x$ amplitude")
 
-        axs['fourier_xder'].plot(xf[1:N//select_div], 2.0/N * np.abs(f_xder[1:N//select_div]))
-        axs['fourier_xder'].set(ylabel=r"$\dot{x}$ amplitude")
-
-        axs['fourier_xder'].set_xlabel(r"Frequency ($2\pi t$)")
+        if x_signal:
+            axs['x_signal'].plot(self.t, self.x)
+            axs['x_signal'].set(ylabel=r"$x$")
+            axs['x_signal'].set_xlabel(r"$t$")
+            axs['fourier_x'].set_xlabel(r"Frequency ( $2\pi / T$ )")
+        else:
+            axs['fourier_xder'].plot(xf[1:N//select_div], 2.0/N * np.abs(f_xder[1:N//select_div]))
+            axs['fourier_xder'].set(ylabel=r"$\dot{x}$ amplitude")
+            axs['fourier_xder'].set_xlabel(r"Frequency ( $2\pi / T$ )")
 
         if self.fourier_amp_lim is not None:
             axs['fourier_x'].set_ylim(self.fourier_amp_lim)
-            axs['fourier_xder'].set_ylim(self.fourier_amp_lim)
+            if x_signal:
+                axs['x_signal'].set_ylim(self.x_lims)
+            else:
+                axs['fourier_xder'].set_ylim(self.fourier_amp_lim)
+            
+        if x_signal:
+            if t_cutoff is not None:
+                margin, top_freq = axs['fourier_x'].get_xlim()
+                max_freq = top_freq - np.abs(margin)
+
+                t_max = min(np.max(self.t), t_cutoff)
+                x_margin = np.abs(margin) / max_freq * t_max
+                
+                new_lims = (-x_margin, t_max+x_margin)
+                axs['x_signal'].set_xlim(new_lims)
 
         margin_pct_padding = 0.02
         engine = fig.get_layout_engine()

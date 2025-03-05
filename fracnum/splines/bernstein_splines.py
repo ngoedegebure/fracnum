@@ -32,7 +32,7 @@ class BernsteinSplines:
         self.B_b = BernsteinMethods.build_bernstein_binom_basis(self.n)
 
         # Initialize storage dictionaries of spline multiplication and scaling
-        self.C_storage, self.upscale_storage = {}, {}
+        self.C_storage, self.upscale_storage, self.downscale_storage = {}, {}, {}
 
         # Initialize solution storage
         self.x_storage = None
@@ -63,7 +63,12 @@ class BernsteinSplines:
             elif knot_sel[0] == 'at':
                 # Up to selected knot
                 knot_index = knot_sel[1]
-                int = A[knot_index:(knot_index+1)]
+                if len(A.shape) == 1:
+                    int = np.reshape(A, (1, A.shape[0]))
+                else:
+                    int = A[knot_index:(knot_index+1)]
+            int = self.splines_downscale(int, self.n_eval)
+            # breakpoint()
         else:
             # Get or create the integration basis
             if alpha not in self.B_I.keys():
@@ -146,6 +151,17 @@ class BernsteinSplines:
         result = self.splines_multiply(A, scale_matrix)
         return result
     
+    def splines_downscale(self, A, n_target):
+        m = A.shape[-1]-1 # original order
+        key = (n_target, m)
+        if key in self.downscale_storage.keys():
+            P = self.downscale_storage[key]
+        else:
+            P = BernsteinMethods.bernstein_projection_matrix(m, n_target)
+            self.downscale_storage[key] = P
+        # breakpoint()
+        return np.einsum('nm,km->kn', P, A) # m: original. n: target. k: no. of knots
+    
     def build_and_save_integral_basis(self, alpha_vals, verbose = False, time_verbose = False):
         if self.silent_mode:
             verbose, time_verbose = False, False
@@ -156,3 +172,4 @@ class BernsteinSplines:
     def initialize_solver(self, f, x_0, alpha_vals, beta_vals = 1,forcing_params = {}):
         return SplineSolver(self, f, x_0, alpha_vals, beta_vals = beta_vals, forcing_parameters = forcing_params)
         
+    
