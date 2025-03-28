@@ -73,7 +73,7 @@ class SplineSolver():
                         ####
                         sin_vals_vector = np.array([sin_I_a(t, alpha_f, omega_f) for t in self.bs.t_eval_vals_list])
                         # sin_vals_vector = sin_I_a(self.bs.t_eval_vals_list, alpha_f, omega_f)
-                        # sin_vals = A_f* SplineMethods.a_to_matrix(sin_vals_vector, self.bs.n_eval)
+                        sin_vals = A_f* SplineMethods.a_to_matrix(sin_vals_vector, self.bs.n_eval)
                     else:
                         # If stored, get from storage
                         sin_vals = self.sin_forcing_storage[sin_forcing_storage_key]
