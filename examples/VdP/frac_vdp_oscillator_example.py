@@ -51,9 +51,8 @@ dt = 0.05               # Spline size (also called h) though varying size can al
 c = 3/2                 # Knot size increase constant
 ##
 
-gamm = alpha_damping + beta - alpha_damping*beta # Hilfer gamma parametrization
-
-t_knot_vals = build_hilf_knot_vals(eps, T, c, gamm, dt) # np.linspace(0, T, N_knot_int+1)  # Initialize equidistant knot values [t_0, t_1, t_2 ... t_k]. Can be generalized to anything.
+gamm = alpha_damping + beta - alpha_damping*beta        # Hilfer gamma parametrization
+t_knot_vals = build_hilf_knot_vals(eps, T, c, gamm, dt) # Knot values: equidistant for Caputo (beta = 1)
 
 ####
 
@@ -63,7 +62,7 @@ n_eval = 1 # Polynomial order
 # In general equal to m * n_eval, where m denotes the highest order of multiplication in x-components of f(x)
 n_calc = VdP_bs.N_upscale * n_eval
 
-bs = BernsteinSplines(t_knot_vals, n_calc, n_eval=n_eval)  # Initialize splines setup!
+bs = BernsteinSplines(t_knot_vals, n_calc, n_eval=n_eval, eq_opt=True)  # Initialize splines setup!
 
 mult = bs.splines_multiply   # Bernstein multiplication method
 upscale = bs.splines_upscale # Bernstein upscale method to match the polynomial order (same as multiplying n times with identity splines of the same order)
