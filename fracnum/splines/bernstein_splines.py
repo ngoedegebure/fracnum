@@ -4,10 +4,22 @@ from .static_bernstein_methods import BernsteinMethods
 from .spline_solvers import SplineSolver
 
 class BernsteinSplines:
-    def __init__(self, t_knot_vals, n, n_eval = None, alpha_init = None, silent_mode = False, magnify = None):        
+    def __init__(self, t_knot_vals, n, n_eval = None, alpha_init = None, silent_mode = False, magnify = None, eq_opt = True, eq_opt_tol = 1e-10):        
         self.t_knot_vals = t_knot_vals  # Knot values t_0, t_1, t_2 ... t_k
         self.h = np.diff(t_knot_vals)   # Knot sizes h_0 ... h_{k-1}
         self.n = n                      # Polynomial calculation order
+
+        # Optimizes for equidistant grid: saves A LOT of memory. Mostly useful for Caputo (\beta = 1)
+        if eq_opt:
+            # Extra check: check whether grid is actually equidistant 
+            if np.max(np.abs(np.diff(self.h))) < eq_opt_tol:
+                self.eq_opt = True
+                print('NOTE: Equidistant grid optimization enabled!')
+            else:
+                self.eq_opt = False
+                print(f'WARNING: Equidistant grid optimization disabled since grid not equidistant (tol: {eq_opt_tol:.1e})')
+        else:
+            self.eq_opt = False            
 
         # Get calculation t values
         self.t_calc_vals_ord, self.t_calc_vals_list = SplineMethods.build_total_t_vals(t_knot_vals, n, magnify= magnify)
@@ -24,9 +36,12 @@ class BernsteinSplines:
         # Empty integral basis storage
         self.B_I, self.B_I_scalar = {}, {}
 
+        if self.eq_opt:
+            self.B_I_opt = {}
+
         # If initialization request is given in arguments, use this
-        if alpha_init is not None:
-            self.B_I[self.alpha] = SplineMethods.build_integral_basis(self.alpha, self.t_calc_vals_ord, self.t_eval_vals_ord, verbose = True)
+        if alpha_init is not None and self.eq_opt == False:
+            self.B_I[alpha_init] = SplineMethods.build_integral_basis(alpha_init, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose = True, time_verbose = True)
         
         # Build binomial basis (converts Bernstein polynomials to monomials)
         self.B_b = BernsteinMethods.build_bernstein_binom_basis(self.n)
@@ -71,8 +86,11 @@ class BernsteinSplines:
             # breakpoint()
         else:
             # Get or create the integration basis
-            if alpha not in self.B_I.keys():
+            if (knot_sel is None or self.eq_opt == False) and alpha not in self.B_I.keys():
                 self.B_I[alpha] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose = progress_verbose, time_verbose = time_verbose)
+            elif (knot_sel is not None and self.eq_opt == True) and alpha not in self.B_I_opt.keys():
+                N = self.t_eval_vals_ord.shape[0]
+                self.B_I_opt[alpha] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, self.t_eval_vals_ord[(N-1):N, :], progress_verbose = progress_verbose, time_verbose = time_verbose)
 
             if knot_sel is None:
                 # All knots
@@ -80,11 +98,26 @@ class BernsteinSplines:
             elif knot_sel[0] == 'to':
                 # Up to selected knot
                 knot_index = knot_sel[1]
-                int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I[alpha][:(knot_index+1), :, knot_index, :])
+                if self.eq_opt:
+                    # breakpoint()
+                    ## Eq opt here!
+                    N_knots = self.B_I_opt[alpha].shape[0]
+                    start_knot = N_knots-knot_index
+                    # print(f"start_knot {start_knot}")
+                    # if knot_index==N_knots:
+                    # breakpoint()
+                    int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, 0, :])
+                else:
+                    int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I[alpha][:(knot_index+1), :, knot_index, :])
             elif knot_sel[0] == 'at':
                 # Only selected knot
                 knot_index = knot_sel[1]
-                int = np.einsum('l,ln->n', A@self.B_b, self.B_I[alpha][knot_index, :, knot_index, :])
+                if self.eq_opt:
+                    # breakpoint()
+                    ## Eq opt here!
+                    int = np.einsum('l,ln->n', A@self.B_b, self.B_I_opt[alpha][-1, :, 0, :])
+                else:
+                    int = np.einsum('l,ln->n', A@self.B_b, self.B_I[alpha][knot_index, :, knot_index, :])
 
         if to_vector:
             return SplineMethods.a_to_vector(int)
@@ -163,11 +196,14 @@ class BernsteinSplines:
         return np.einsum('nm,km->kn', P, A) # m: original. n: target. k: no. of knots
     
     def build_and_save_integral_basis(self, alpha_vals, verbose = False, time_verbose = False):
-        if self.silent_mode:
-            verbose, time_verbose = False, False
-        for alpha_val in alpha_vals:
-            if alpha_val not in self.B_I.keys():
-                self.B_I[alpha_val] = SplineMethods.build_integral_basis(alpha_val, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose=verbose, time_verbose=time_verbose)
+        if self.eq_opt == False:
+            if self.silent_mode:
+                verbose, time_verbose = False, False
+            for alpha_val in alpha_vals:
+                if alpha_val not in self.B_I.keys():
+                    self.B_I[alpha_val] = SplineMethods.build_integral_basis(alpha_val, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose=verbose, time_verbose=time_verbose)
+        else:
+            print("NOTE: No full basis element calculation since equidistant grid opt. enabled")
     
     def initialize_solver(self, f, x_0, alpha_vals, beta_vals = 1,forcing_params = {}):
         return SplineSolver(self, f, x_0, alpha_vals, beta_vals = beta_vals, forcing_parameters = forcing_params)

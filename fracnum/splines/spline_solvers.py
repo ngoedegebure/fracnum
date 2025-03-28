@@ -6,6 +6,7 @@ from scipy.special import gamma
 import time
 from tqdm import tqdm
 import copy
+from sys import getsizeof
 
 class SplineSolver():
     # Solver method for boundary and initial value problems (BVP and IVP's)
@@ -49,7 +50,9 @@ class SplineSolver():
     def build_forcing_values(self, forcing_parameters):
         # Initialize forcing values as 0 
         # Needs to be float in order to not create errors on addition later
-        forcing_vals = [np.array([0], dtype='float64')] * self.d
+        print('Building forcing values...')
+        tic = time.time()
+        forcing_vals = [np.array([0], dtype='float32')] * self.d
 
         for forcing_element in forcing_parameters:
             # Initialize sin and c_vals as 0
@@ -67,8 +70,10 @@ class SplineSolver():
                     if sin_forcing_storage_key not in self.sin_forcing_storage.keys():
                         # Get sine values with sin_I_a method. Not possible to do vector-wise
                         # because of mpmath, hence the for-loop
+                        ####
                         sin_vals_vector = np.array([sin_I_a(t, alpha_f, omega_f) for t in self.bs.t_eval_vals_list])
-                        sin_vals = A_f* SplineMethods.a_to_matrix(sin_vals_vector, self.bs.n_eval)
+                        # sin_vals_vector = sin_I_a(self.bs.t_eval_vals_list, alpha_f, omega_f)
+                        # sin_vals = A_f* SplineMethods.a_to_matrix(sin_vals_vector, self.bs.n_eval)
                     else:
                         # If stored, get from storage
                         sin_vals = self.sin_forcing_storage[sin_forcing_storage_key]
@@ -83,6 +88,11 @@ class SplineSolver():
 
             # Sum the two together
             forcing_vals[dim] = sin_vals + c_vals
+        toc = time.time()
+        elapsed = toc - tic
+        size = sum([getsizeof(forcing_vals[i]) for i in range(self.d)])
+        print(f'... forcing values built ({elapsed:.2f} s, {size/(10**6):.2f} MB)!')
+        # breakpoint()
 
         return forcing_vals
     
@@ -323,9 +333,10 @@ class SplineSolver():
             if n_tot_it == (conv_max_it - 1):
                 print(f"WARNING: max iterations ({conv_max_it}) reached on one knot, increment norm {it_norm}")
 
-        if (1-self.gamma[0]) != 0:
-            bvp_test = self.bs.I_a_scalar(T, x[0, :, :], 1-self.gamma[0])
-            print('bvp_test, _0I^(gamma-1)_T x(t) = ', bvp_test)
+        ### TODO: FIX UPSCALING BELOW!!!
+        # if (1-self.gamma[0]) != 0:
+        #     bvp_test = self.bs.I_a_scalar(T, x[0, :, :], 1-self.gamma[0])
+        #     print('bvp_test, _0I^(gamma-1)_T x(t) = ', bvp_test)
 
         return x, f_a_vals, n_tot_it, it_norm
 

@@ -85,12 +85,12 @@ class SplineMethods:
         return a_vector
     
     @staticmethod
-    def build_integral_basis(alpha, calc_vals_matrix, eval_vals_matrix, progress_verbose = True, time_verbose = True):
+    def build_integral_basis(alpha, calc_vals_matrix, eval_vals_matrix, progress_verbose = True, time_verbose = True, dtype='float32'):
         if alpha == 0:
             return None
         # Initialize basis function tensor of the shape:
         # B_I[knot_calc, order_calc, order_eval]
-        B_I = np.zeros([calc_vals_matrix.shape[0], calc_vals_matrix.shape[1], eval_vals_matrix.shape[0], eval_vals_matrix.shape[1]])
+        B_I = np.zeros([calc_vals_matrix.shape[0], calc_vals_matrix.shape[1], eval_vals_matrix.shape[0], eval_vals_matrix.shape[1]], dtype=dtype)
 
         # Two short hand aliases here
         n_knots = calc_vals_matrix.shape[0]
