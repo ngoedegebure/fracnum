@@ -14,7 +14,7 @@ class BernsteinSplines:
             # Extra check: check whether grid is actually equidistant 
             if np.max(np.abs(np.diff(self.h))) < eq_opt_tol:
                 self.eq_opt = True
-                print('NOTE: Equidistant grid optimization enabled!')
+                print('NOTE: Equidistant grid optimization enabled')
             else:
                 self.eq_opt = False
                 print(f'WARNING: Equidistant grid optimization disabled since grid not equidistant (tol: {eq_opt_tol:.1e})')
@@ -200,8 +200,6 @@ class BernsteinSplines:
             for alpha_val in alpha_vals:
                 if alpha_val not in self.B_I.keys():
                     self.B_I[alpha_val] = SplineMethods.build_integral_basis(alpha_val, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose=verbose, time_verbose=time_verbose)
-        else:
-            print("NOTE: No full basis element calculation since equidistant grid opt. enabled")
     
     def initialize_solver(self, f, x_0, alpha_vals, beta_vals = 1,forcing_params = {}):
         return SplineSolver(self, f, x_0, alpha_vals, beta_vals = beta_vals, forcing_parameters = forcing_params)
