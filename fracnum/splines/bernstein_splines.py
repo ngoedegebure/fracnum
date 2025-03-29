@@ -198,6 +198,7 @@ class BernsteinSplines:
             if self.silent_mode:
                 verbose, time_verbose = False, False
             for alpha_val in alpha_vals:
+                alpha_val = float(alpha_val)
                 if alpha_val not in self.B_I.keys():
                     self.B_I[alpha_val] = SplineMethods.build_integral_basis(alpha_val, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose=verbose, time_verbose=time_verbose)
     
