@@ -1,13 +1,15 @@
 import time
 from scipy.special import gamma, betainc, beta
 from tqdm import tqdm
-import numpy as np
+from .backend import np
 
 class SplineMethods:
     @staticmethod
     def build_total_t_vals(t_knot_vals, n, magnify = None):
         # Builds the coefficient t values for chosen knots and polynomial order
         # Returns both ordered per knot (first element) and a vector of all values (second element) 
+
+        t_knot_vals = np.asarray(t_knot_vals)
 
         if magnify is not None:
             knot_index, n_mag = magnify

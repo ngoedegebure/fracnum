@@ -1,4 +1,4 @@
-import numpy as np
+from .backend import np
 from scipy.special import binom, comb
 
 class BernsteinMethods:

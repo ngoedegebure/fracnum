@@ -1,5 +1,4 @@
 import numpy as np
-
 from scipy.special import gamma
 from mpmath import hyp1f2
 
@@ -96,8 +95,8 @@ def I_rl_rect_left(alpha_int, t_vals_int):
 
     return J
 
-def build_hilf_knot_vals(eps, T, c, gamm, h_max):
-    if gamm == 1:
+def build_hilf_knot_vals(eps, T, c, gamm, h_max, tol = 1e-10):
+    if np.abs(gamm - 1) < tol:
         return np.linspace(0, T, int(T/h_max)+1)
     t_vals = np.array([eps])
     t = eps

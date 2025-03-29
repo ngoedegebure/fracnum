@@ -37,7 +37,6 @@ class ExperimentationHandler():
                 step_size = vary_dict[key]['step_size']
                 N = int(np.round(np.abs(b-a)/step_size,0)) + 1
                 space_dict[key] = np.linspace(a, b, N)
-                # breakpoint()
 
         return space_dict
     
@@ -82,6 +81,10 @@ class ExperimentationHandler():
         for new_inputs in combinations:
             # Main loop
             alpha, x_0, params, forcing_params = self.get_values_for_run(param_types, param_names, new_inputs)
+
+            if i_run > 0:
+                if alpha != alpha_prev:
+                    self.bs.B_I, self.bs.B_I_scalar = {}, {}
             
             if verbose:
                 print(f"\n--- Experiment {i_run+1}/{n_runs} ---")
@@ -103,6 +106,7 @@ class ExperimentationHandler():
             data_obj.update_ds(new_inputs, results)
 
             i_run += 1
+            alpha_prev = copy.copy(alpha)
 
         data_obj.store_if_needed()
 

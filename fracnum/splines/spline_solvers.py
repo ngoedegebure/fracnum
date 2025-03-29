@@ -1,12 +1,12 @@
 from .static_spline_methods import SplineMethods
 from .static_bernstein_methods import BernsteinMethods
 from fracnum.numerical import sin_I_a
-import numpy as np
 from scipy.special import gamma
 import time
 from tqdm import tqdm
 import copy
 from sys import getsizeof
+from .backend import np
 
 class SplineSolver():
     # Solver method for boundary and initial value problems (BVP and IVP's)
@@ -44,15 +44,15 @@ class SplineSolver():
             assert 0
         elif np.array(alpha_vals).size == d:
             # If d values provided, all is fine!
-            alpha_parsed = alpha_vals
+            alpha_parsed = np.array(alpha_vals)
         return alpha_parsed
 
     def build_forcing_values(self, forcing_parameters):
         # Initialize forcing values as 0 
         # Needs to be float in order to not create errors on addition later
-        print('Building forcing values...')
         tic = time.time()
         forcing_vals = [np.array([0], dtype='float32')] * self.d
+        forcing_enabled = False
 
         for forcing_element in forcing_parameters:
             # Initialize sin and c_vals as 0
@@ -65,6 +65,8 @@ class SplineSolver():
             if 'A' in forcing_element.keys() and 'omega' in forcing_element.keys():
                 A_f, omega_f = forcing_element['A'], forcing_element['omega']
                 if A_f !=0 and omega_f != 0:
+                    print('Building sine forcing values...')
+                    forcing_enabled = True
                     # If sin forcing enabled
                     sin_forcing_storage_key = (alpha_f, A_f, omega_f)
                     if sin_forcing_storage_key not in self.sin_forcing_storage.keys():
@@ -81,6 +83,8 @@ class SplineSolver():
             if 'c' in forcing_element.keys():
                 c_f = forcing_element['c']
                 if c_f != 0:
+                    print('Building constant forcing values...')
+                    forcing_enabled = True
                     # If constant forcing enabled
                     # The alpha-fractional integral of 1 is given by: t^alpha / gamma(alpha+1)
                     constant_int_vals = self.bs.t_eval_vals_list**(alpha_f)/gamma(alpha_f+1)
@@ -88,11 +92,12 @@ class SplineSolver():
 
             # Sum the two together
             forcing_vals[dim] = sin_vals + c_vals
-        toc = time.time()
-        elapsed = toc - tic
-        size = sum([getsizeof(forcing_vals[i]) for i in range(self.d)])
-        print(f'... forcing values built ({elapsed:.2f} s, {size/(10**6):.2f} MB)!')
-        # breakpoint()
+
+        if forcing_enabled:
+            toc = time.time()
+            elapsed = toc - tic
+            size = sum([getsizeof(forcing_vals[i]) for i in range(self.d)])
+            print(f'... forcing values built ({elapsed:.2f} s, {size/(10**6):.2f} MB)!')
 
         return forcing_vals
     
@@ -127,27 +132,36 @@ class SplineSolver():
 
         N_knots = x[0, :, :].shape[0] # SSOT: can be computed from x
         if t_eval is not None:
+            t_eval = np.asarray(t_eval)
             x_vals = np.array([
                 # SplineMethods.a_to_vector(x[i, :, :])
                 t_eval**(self.gamma[i]-1)*\
                 BernsteinMethods.eval_t(x[i, :, :], self.bs.t_knot_vals, t_eval, der= False)
-                  for i in range(self.d)
+                    for i in range(self.d)
                 ])
         else:
-            x_vals = np.array([SplineMethods.a_to_vector(x[i, :, :]) for i in range(self.d)]).T, #TODO: transpose? CHECK!
-
+            x_vals = np.array([SplineMethods.a_to_vector(x[i, :, :]) for i in range(self.d)]).T #TODO: transpose? CHECK!
+            
+        if np.__name__ == 'cupy':
+            t_out = np.asnumpy(self.bs.t_eval_vals_list)
+            x_vals = np.asnumpy(x_vals)
+            x = np.asnumpy(x)
+            f_0 = np.asnumpy(f_0)
+        else:
+            t_out = self.bs.t_eval_vals_list
+            
         output_dict = {
-            't': self.bs.t_eval_vals_list,
+            't': t_out,
             # Below looks a bit confusing, but the logic is: a is the ordered coefficients and x the "flat" evaluation
             'x': x_vals,
             'a': x, 
             'norm_type':norm,
             'norm_value':it_norm,
-            'n_it':n_tot_it,
-            'total_time':total_time,
-            'time_per_it':total_time/n_tot_it,
-            'n_it_per_knot':n_tot_it/N_knots,
-            'time_per_knot':total_time/N_knots,
+            'n_it':int(n_tot_it),
+            'total_time':float(total_time),
+            'time_per_it':float(total_time/n_tot_it),
+            'n_it_per_knot':float(n_tot_it/N_knots),
+            'time_per_knot':float(total_time/N_knots),
             'f_0':f_0,
             'T':T,
             'delta':delta
@@ -221,9 +235,9 @@ class SplineSolver():
                         t_gamma_vals[k, :, :] = self.bs.t_eval_vals_ord[i_knot, :]**(self.gamma[k]-1)
 
                     # breakpoint()
-                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_eval_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :] * t_gamma_vals)
+                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_calc_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :] * t_gamma_vals)
                 else:
-                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_eval_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :])
+                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_calc_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :])
                     
                 ### Compute integration for each element ###
                 for k in range(self.d):

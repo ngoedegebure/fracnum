@@ -1,7 +1,7 @@
-import numpy as np
 from .static_spline_methods import SplineMethods
 from .static_bernstein_methods import BernsteinMethods
 from .spline_solvers import SplineSolver
+from .backend import np
 
 class BernsteinSplines:
     def __init__(self, t_knot_vals, n, n_eval = None, alpha_init = None, silent_mode = False, magnify = None, eq_opt = True, eq_opt_tol = 1e-10):        
@@ -68,6 +68,7 @@ class BernsteinSplines:
         return int
 
     def I_a(self, A, alpha, knot_sel = None, to_vector = False, progress_verbose = True, time_verbose = False):
+        alpha = float(alpha)
         if alpha == 0:
             if knot_sel is None:
                 # All knots
@@ -83,7 +84,6 @@ class BernsteinSplines:
                 else:
                     int = A[knot_index:(knot_index+1)]
             int = self.splines_downscale(int, self.n_eval)
-            # breakpoint()
         else:
             # Get or create the integration basis
             if (knot_sel is None or self.eq_opt == False) and alpha not in self.B_I.keys():
@@ -99,13 +99,10 @@ class BernsteinSplines:
                 # Up to selected knot
                 knot_index = knot_sel[1]
                 if self.eq_opt:
-                    # breakpoint()
                     ## Eq opt here!
                     N_knots = self.B_I_opt[alpha].shape[0]
                     start_knot = N_knots-knot_index
-                    # print(f"start_knot {start_knot}")
-                    # if knot_index==N_knots:
-                    # breakpoint()
+                    
                     int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, 0, :])
                 else:
                     int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I[alpha][:(knot_index+1), :, knot_index, :])
@@ -113,12 +110,11 @@ class BernsteinSplines:
                 # Only selected knot
                 knot_index = knot_sel[1]
                 if self.eq_opt:
-                    # breakpoint()
                     ## Eq opt here!
                     int = np.einsum('l,ln->n', A@self.B_b, self.B_I_opt[alpha][-1, :, 0, :])
                 else:
                     int = np.einsum('l,ln->n', A@self.B_b, self.B_I[alpha][knot_index, :, knot_index, :])
-
+                    
         if to_vector:
             return SplineMethods.a_to_vector(int)
         else:
@@ -192,8 +188,10 @@ class BernsteinSplines:
         else:
             P = BernsteinMethods.bernstein_projection_matrix(m, n_target)
             self.downscale_storage[key] = P
-        # breakpoint()
-        return np.einsum('nm,km->kn', P, A) # m: original. n: target. k: no. of knots
+            
+        res = np.einsum('nm,km->kn', P, A) # m: original. n: target. k: no. of knots
+        
+        return res
     
     def build_and_save_integral_basis(self, alpha_vals, verbose = False, time_verbose = False):
         if self.eq_opt == False:
