@@ -226,7 +226,7 @@ class SplineSolver():
             for conv_it in range(conv_max_it):
                 ### Main iteration: converge the value for the to-be-calculated knot t_M ###
 
-                x_prev = x.copy() # Saves previous estimate for convergence statistics
+                x_prev_loc = x[:, i_knot, :].copy() # Saves previous estimate for convergence statistics
 
                 # Compute function values f(t_M, x_M)
                 if self.hilfer and new_hilf:
@@ -261,7 +261,7 @@ class SplineSolver():
                 n_tot_it+=1 # Track iteration
 
                 # Compute norm change
-                it_norm = SplineSolver.it_norm(x, x_prev, norm)
+                it_norm = SplineSolver.it_norm(x[:, i_knot, :], x_prev_loc, norm)
 
                 if verbose:
                     print(f'{norm}-norm change', it_norm)
