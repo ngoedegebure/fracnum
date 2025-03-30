@@ -87,19 +87,16 @@ class SplineMethods:
         return a_vector
     
     @staticmethod
-    def build_integral_basis(alpha, calc_vals_matrix, eval_vals_matrix, progress_verbose = True, time_verbose = True, dtype='float32'):
+    def build_integral_basis(alpha, calc_vals_matrix, t_eval_vals_list, progress_verbose = True, time_verbose = True, dtype='float32'):
         if alpha == 0:
             return None
         # Initialize basis function tensor of the shape:
         # B_I[knot_calc, order_calc, order_eval]
-        B_I = np.zeros([calc_vals_matrix.shape[0], calc_vals_matrix.shape[1], eval_vals_matrix.shape[0], eval_vals_matrix.shape[1]], dtype=dtype)
+        B_I = np.zeros([calc_vals_matrix.shape[0], calc_vals_matrix.shape[1], t_eval_vals_list.size], dtype=dtype)
 
         # Two short hand aliases here
         n_knots = calc_vals_matrix.shape[0]
-        n_eval = eval_vals_matrix.shape[1] - 1
-
-        # Compute the eval functions as list
-        t_eval_vals_list = SplineMethods.a_to_vector(eval_vals_matrix)
+        n_eval = t_eval_vals_list.size
 
         # Get left and right points of knots and knot sizes (dt)
         t_a, t_b = calc_vals_matrix[:, 0], calc_vals_matrix[:, -1]
@@ -111,7 +108,8 @@ class SplineMethods:
 
         time_basis, time_reshape = 0,0
         disable_progress = not progress_verbose
-        # breakpoint()
+        
+        # TODO: paralellize this for the orders!
         for order_k in tqdm(range(calc_vals_matrix.shape[1]), desc=f"Building integral basis alpha = {alpha}", disable = disable_progress):
             ################################################
             ## Main work below: computes the basis values ##
@@ -120,14 +118,8 @@ class SplineMethods:
             B_I_vals_list = (dt**alpha * SplineMethods.I_a_b_beta(s_i, alpha, order_k, [0, 1]).T).T
             toc_c = time.time()
             time_basis+=toc_c-tic_c
-
-            # Reshape into matrix values. Takes a bit of time but still more efficient than doing the loop before
-            # TODO (possibly) remove for loop in this reshaping bit!
-            tic_r = time.time()
-            for calc_knot in range(n_knots):
-                B_I[calc_knot, order_k, :, :] = SplineMethods.a_to_matrix(B_I_vals_list[calc_knot, :], n_eval)
-            toc_r = time.time()
-            time_reshape += toc_r-tic_r
+            
+            B_I[:, order_k, :] = B_I_vals_list[:, :]
 
         if time_verbose:
             print(f"~ Integral basis alpha = {alpha} finished. Calculations: {time_basis:.4f} s. Reshaping: {time_reshape:.4f} s")
