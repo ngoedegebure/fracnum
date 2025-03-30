@@ -124,3 +124,10 @@ class SplineMethods:
         if time_verbose:
             print(f"~ Integral basis alpha = {alpha} finished. Calculations: {time_basis:.4f} s. Reshaping: {time_reshape:.4f} s")
         return B_I
+    
+    @staticmethod
+    def i_knot_to_vector(i, q):
+        start = i*q
+        stop  = i*q + q + 1
+
+        return slice(start, stop)

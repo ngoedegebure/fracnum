@@ -38,6 +38,7 @@ class BernsteinSplines:
 
         if self.eq_opt:
             self.B_I_opt = {}
+            self.B_b_B_I_opt = {}
 
         # If initialization request is given in arguments, use this
         if alpha_init is not None and self.eq_opt == False:
@@ -68,8 +69,12 @@ class BernsteinSplines:
         return int
 
     def I_a(self, A, alpha, knot_sel = None, to_vector = False, progress_verbose = True, time_verbose = False):
+        q = self.n_eval
+
         alpha = float(alpha)
         if alpha == 0:
+            print("WARNING: support for alpha = 0 needs new implementation!")
+            return False
             if knot_sel is None:
                 # All knots
                 int = A
@@ -91,10 +96,11 @@ class BernsteinSplines:
             elif (knot_sel is not None and self.eq_opt == True) and alpha not in self.B_I_opt.keys():
                 N = self.t_eval_vals_ord.shape[0]
                 self.B_I_opt[alpha] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, self.t_eval_vals_ord[(N-1):N, :], progress_verbose = progress_verbose, time_verbose = time_verbose)
-
+                self.B_b_B_I_opt[alpha] = self.B_b@self.B_I_opt[alpha][-1, :, :]
+            
             if knot_sel is None:
                 # All knots
-                int = np.einsum('kl,klmn->mn', A@self.B_b, self.B_I[alpha])
+                int = np.einsum('kl,kln->n', A@self.B_b, self.B_I[alpha])
             elif knot_sel[0] == 'to':
                 # Up to selected knot
                 knot_index = knot_sel[1]
@@ -102,23 +108,29 @@ class BernsteinSplines:
                     ## Eq opt here!
                     N_knots = self.B_I_opt[alpha].shape[0]
                     start_knot = N_knots-knot_index
+                    # breakpoint()
                     
-                    int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, 0, :])
+                    # int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, :])
+                    int= np.tensordot(A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, :], axes=2)
                 else:
+                    # TODO: get index to non-optimized setup!! Needs smarter selection
                     int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I[alpha][:(knot_index+1), :, knot_index, :])
             elif knot_sel[0] == 'at':
                 # Only selected knot
                 knot_index = knot_sel[1]
                 if self.eq_opt:
                     ## Eq opt here!
-                    int = np.einsum('l,ln->n', A@self.B_b, self.B_I_opt[alpha][-1, :, 0, :])
+                    # breakpoint()
+                    # int = np.einsum('l,ln->n', A@self.B_b, self.B_I_opt[alpha][-1, :, :])
+                    int =  A@self.B_b_B_I_opt[alpha] 
                 else:
+                    # TODO: get index to non-optimized setup!! Needs smarter selection
                     int = np.einsum('l,ln->n', A@self.B_b, self.B_I[alpha][knot_index, :, knot_index, :])
                     
         if to_vector:
-            return SplineMethods.a_to_vector(int)
+            return # SplineMethods.a_to_vector(int)
         else:
-            return int
+            return SplineMethods.a_to_matrix(int, q)# int
 
     def ddt(self, A, to_vector=True, upscale = True):
         # Computes the derivative of Bernstein splines...
