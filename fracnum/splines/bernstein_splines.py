@@ -1,7 +1,7 @@
 from .static_spline_methods import SplineMethods
 from .static_bernstein_methods import BernsteinMethods
 from .spline_solvers import SplineSolver
-from .backend import np
+from .backend import np, einsum, int_contract
 
 class BernsteinSplines:
     def __init__(self, t_knot_vals, n, n_eval = None, alpha_init = None, silent_mode = False, magnify = None, eq_opt = True, eq_opt_tol = 1e-10):        
@@ -38,6 +38,7 @@ class BernsteinSplines:
 
         if self.eq_opt:
             self.B_I_opt = {}
+            self.B_b_B_I_opt = {}
 
         # If initialization request is given in arguments, use this
         if alpha_init is not None and self.eq_opt == False:
@@ -64,7 +65,7 @@ class BernsteinSplines:
             t_matrix_val = np.reshape(t, [1,1])
             self.B_I_scalar[index_key] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, t_matrix_val, time_verbose=time_verbose, progress_verbose = False)
 
-        int = np.einsum('kl,kl->',A@self.B_b, self.B_I_scalar[index_key][:, :, 0, 0])
+        int = einsum('kl,kl->',A@self.B_b, self.B_I_scalar[index_key][:, :, 0, 0])
         return int
 
     def I_a(self, A, alpha, knot_sel = None, to_vector = False, progress_verbose = True, time_verbose = False):
@@ -91,10 +92,11 @@ class BernsteinSplines:
             elif (knot_sel is not None and self.eq_opt == True) and alpha not in self.B_I_opt.keys():
                 N = self.t_eval_vals_ord.shape[0]
                 self.B_I_opt[alpha] = SplineMethods.build_integral_basis(alpha, self.t_calc_vals_ord, self.t_eval_vals_ord[(N-1):N, :], progress_verbose = progress_verbose, time_verbose = time_verbose)
+                self.B_b_B_I_opt[alpha] = self.B_b@self.B_I_opt[alpha][-1, :, 0, :]
 
             if knot_sel is None:
                 # All knots
-                int = np.einsum('kl,klmn->mn', A@self.B_b, self.B_I[alpha])
+                int = einsum('kl,klmn->mn', A@self.B_b, self.B_I[alpha])
             elif knot_sel[0] == 'to':
                 # Up to selected knot
                 knot_index = knot_sel[1]
@@ -103,17 +105,25 @@ class BernsteinSplines:
                     N_knots = self.B_I_opt[alpha].shape[0]
                     start_knot = N_knots-knot_index
                     
-                    int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, 0, :])
+                    # int = einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, 0, :])
+                    int = int_contract(A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, 0, :], einsum_dims = 'kl,kln->n', tensordot_axes=([0, 1], [0, 1]))
+                    
+                    # AB_b = A[:(knot_index+1), :]@self.B_b
+                    # J = self.B_I_opt[alpha][(start_knot-1):(N_knots), :, 0, :]
+                    # int = np.tensordot(AB_b, J)
+                    # int  = np.tensordot(A[:(knot_index+1), :]@self.B_b, self.B_I_opt[alpha][(start_knot-1):(N_knots), :, 0, :], axes=([0, 1], [0, 1]))
                 else:
-                    int = np.einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I[alpha][:(knot_index+1), :, knot_index, :])
+                    int = einsum('kl,kln->n', A[:(knot_index+1), :]@self.B_b, self.B_I[alpha][:(knot_index+1), :, knot_index, :])
             elif knot_sel[0] == 'at':
                 # Only selected knot
                 knot_index = knot_sel[1]
                 if self.eq_opt:
                     ## Eq opt here!
-                    int = np.einsum('l,ln->n', A@self.B_b, self.B_I_opt[alpha][-1, :, 0, :])
+                    # int = einsum('l,ln->n', A@self.B_b, self.B_I_opt[alpha][-1, :, 0, :])
+                    int = int_contract(A,self.B_b_B_I_opt[alpha], einsum_dims = 'l,ln->n', tensordot_axes=(0, 0))
+                    # int=np.dot(A,self.B_b_B_I_opt[alpha])
                 else:
-                    int = np.einsum('l,ln->n', A@self.B_b, self.B_I[alpha][knot_index, :, knot_index, :])
+                    int = einsum('l,ln->n', A@self.B_b, self.B_I[alpha][knot_index, :, knot_index, :])
                     
         if to_vector:
             return SplineMethods.a_to_vector(int)
@@ -143,8 +153,6 @@ class BernsteinSplines:
         if A.shape[0] != B.shape[0]:
             print('Multiplication not allowed! Number of rows does not correspond!')
             assert 0
-        else:
-            n_rows = A.shape[0]
 
         n = A.shape[1] - 1
         m = B.shape[1] - 1
@@ -157,7 +165,7 @@ class BernsteinSplines:
             C = BernsteinMethods.build_C_matrix(n, m)
             self.C_storage[index_tuple] = C
 
-        D = np.einsum('kij,mi,mj->mk', C, A, B)
+        D = einsum('kij,mi,mj->mk', C, A, B)
 
         return D
 
@@ -189,7 +197,7 @@ class BernsteinSplines:
             P = BernsteinMethods.bernstein_projection_matrix(m, n_target)
             self.downscale_storage[key] = P
             
-        res = np.einsum('nm,km->kn', P, A) # m: original. n: target. k: no. of knots
+        res = einsum('nm,km->kn', P, A) # m: original. n: target. k: no. of knots
         
         return res
     

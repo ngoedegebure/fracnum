@@ -140,7 +140,7 @@ class SplineSolver():
                     for i in range(self.d)
                 ])
         else:
-            x_vals = np.array([SplineMethods.a_to_vector(x[i, :, :]) for i in range(self.d)]).T #TODO: transpose? CHECK!
+            x_vals = np.array([SplineMethods.a_to_vector(x[i, :, :]) for i in range(self.d)]) #TODO: transpose? CHECK!
             
         if np.__name__ == 'cupy':
             t_out = np.asnumpy(self.bs.t_eval_vals_list)

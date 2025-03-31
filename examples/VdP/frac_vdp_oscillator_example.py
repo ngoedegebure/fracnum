@@ -22,7 +22,7 @@ Enjoy the stability, quasiperiodicity and chaos!
 ######################
 
 alpha_damping = 0.8     # Fractional order of damping
-beta = 0.5              # Hilfer Beta
+beta = 1              # Hilfer Beta
 
 params = {
     'mu': 1     # mu parameter of VdP oscillator
@@ -45,7 +45,7 @@ VdP_bs = fr.ode_functions.VdP(params, bernstein = True, transpose = False)
 ###################
 
 ### Knot input values ###
-T = 50           # Integration max time
+T = 100                 # Integration max time
 eps = 10**(-15)         # Time shift epsilon, start of interval
 dt = 0.05               # Spline size (also called h) though varying size can also be used by creating a custom t_knot_vals
 c = 3/2                 # Knot size increase constant
@@ -74,7 +74,7 @@ VdP_bs.set_bs_mult_upscale_functions(mult, upscale)
 ############
 
 # Initial value (x, y).
-x_0 = np.array([2, 0])
+x_0 = np.array([0, 0])
 
 # alpha for x and y component separately. For reference, see https://doi.org/10.1016/j.chaos.2006.05.010
 system_alpha_vals = [alpha_damping, 2-alpha_damping]    
