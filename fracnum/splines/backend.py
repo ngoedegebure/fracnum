@@ -14,6 +14,10 @@ NUMBA_PARALLEL = str_to_bool(os.getenv("NUMBA_PARALLEL", "1"))
 if BACKEND_ENGINE == "cupy":
     import cupy as np    
     from cupy import einsum
+
+    if not np.cuda.is_available():
+        print("Warning: using cupy but CUDA is not available.")
+
 else:
     import numpy as np
     if OPT_EINSUM:
