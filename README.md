@@ -19,7 +19,9 @@ python -m venv .venv ; source .venv/bin/activate ; python -m pip install -e .
 ```
 
 ## Optional: CUDA acceleration
-Fracnum supports using cupy as a drop-in replacement for numpy. To enable this, install optional dependences with `pip install -e .[gpu]`, and change `BACKEND_ENGINE=cupy` in `environment.env`. 
+Fracnum supports using cupy as a drop-in replacement for numpy. To enable this, install optional dependences with `pip install -e .[gpu]`, and change `BACKEND_ENGINE=cupy` in `environment.env`.  
+
+`cupy` is not faster than `numpy` for smaller problems. But [experimentally](experiments/performance/running_times.txt), at a simulation of about 750.000 iterations, `cupy` saves significant time.
 
 ## Example file for pretty pictures:
 
