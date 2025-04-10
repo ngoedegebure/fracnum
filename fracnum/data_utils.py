@@ -48,7 +48,7 @@ class DataHandler():
         return self.ds
     
     def update_ds(self, param_vals, results):
-        x = results['x']
+        x = results['x'].T
         param_names = list(self.param_space.keys())
         save_ts, save_ts_der = self.save_ts, self.save_ts_der
 
