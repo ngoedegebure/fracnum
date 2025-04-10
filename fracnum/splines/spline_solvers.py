@@ -59,7 +59,7 @@ class SplineSolver():
             sin_vals, c_vals = 0,0
             
             dim = forcing_element['dim']    # The dimension to add forcing to
-            alpha_f = self.alpha[dim]       # Alpha value
+            alpha_f = float(self.alpha[dim])       # Alpha value
 
             # sin forcing: I^alpha{ A*sin(omega * t) }
             if 'A' in forcing_element.keys() and 'omega' in forcing_element.keys():
