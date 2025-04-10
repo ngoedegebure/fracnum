@@ -52,7 +52,7 @@ T = 1500                  # Integration max time #1500 for profiling
 n_eval = 1              # Polynomial order
 ##
 eps = 10**(-15)         # Time shift epsilon, start of interval
-dt = 0.05               # Spline size (also called h) though varying size can also be used by creating a custom t_knot_vals
+dt = 0.002               # Spline size (also called h) though varying size can also be used by creating a custom t_knot_vals
 c = 3/2                 # Knot size increase constant
 ##
 
