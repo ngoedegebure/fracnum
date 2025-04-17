@@ -10,11 +10,12 @@ from .backend import np
 
 class SplineSolver():
     # Solver method for boundary and initial value problems (BVP and IVP's)
-    def __init__(self, bs, f, x_0, alpha_vals, beta_vals = 1, forcing_parameters = {}):
+    def __init__(self, bs, f, x_0, alpha_vals, beta_vals = 1, forcing_parameters = {}, f_t_vals_eval_res = False):
         self.bs = bs        # Bernstein spline functions instance
         self.f = f          # System function f
         self.x_0 = x_0      # Initial value # TODO: maybe do this in running?
         self.d = len(x_0)   # Number of dimensions
+        self.f_t_vals_eval_res = f_t_vals_eval_res
 
         self.sin_forcing_storage = {} # Init. storage dictionary for forcing values
 
@@ -32,6 +33,11 @@ class SplineSolver():
         self.forcing_vals = self.build_forcing_values(forcing_parameters)
         # Initialize x storage values
         self.x_storage = None
+
+        if self.f_t_vals_eval_res:
+            self.f_t_vals = self.bs.t_eval_vals_ord
+        else:
+            self.f_t_vals = self.bs.t_calc_vals_ord
 
     @staticmethod
     def parse_alpha(alpha_vals, d):
@@ -184,7 +190,10 @@ class SplineSolver():
         # Note: x(T) = x_0 + delta_T
         delta = np.zeros(self.d)
         for k in range(self.d):
-            delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
+            # OLD:
+            # delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
+            # NEW:
+            delta[k] = - gamma(1-self.gamma[k]+self.alpha[k])*self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])/(T**(1-self.gamma[k]+self.alpha[k]))
         return delta
     
     @staticmethod
@@ -235,9 +244,9 @@ class SplineSolver():
                         t_gamma_vals[k, :, :] = self.bs.t_eval_vals_ord[i_knot, :]**(self.gamma[k]-1)
 
                     # breakpoint()
-                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_calc_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :] * t_gamma_vals)
+                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.f_t_vals[i_knot, :], x[:, i_knot:(i_knot+1), :] * t_gamma_vals)
                 else:
-                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.bs.t_calc_vals_ord[i_knot, :], x[:, i_knot:(i_knot+1), :])
+                    f_a_vals_tot[:, i_knot:(i_knot+1), :] = self.f(self.f_t_vals[i_knot, :], x[:, i_knot:(i_knot+1), :])
                     
                 ### Compute integration for each element ###
                 for k in range(self.d):
@@ -296,7 +305,7 @@ class SplineSolver():
 
         for n_tot_it in range(conv_max_it):
             x_prev = x.copy() # Store previous estimate for increment norm calculation later
-            f_a_vals[:, :, :] = self.f(self.bs.t_eval_vals_ord, x) # Calculate f(x, t)
+            f_a_vals[:, :, :] = self.f(self.f_t_vals, x) # Calculate f(x, t)
 
             for k in range(self.d):
                 # Get _0I^alpha_t f(x,t) for all t_eval
@@ -321,8 +330,16 @@ class SplineSolver():
                 if bvp:
                     # Get delta computation
                     # if self.hilfer:
-                    prefix = (gamma(1-self.gamma[k]+self.alpha[k])/gamma(self.alpha[k])) * ((1-self.gamma[k])/self.alpha[k] + 1)*T**(self.gamma[k]-1) * (self.bs.t_eval_vals_ord/T)**self.alpha[k]
-                    delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])
+                    # TODO: CORRECT NOTATION FOR DELTA AND PREFIX!!!
+
+                    # OLD:
+                    # prefix = (gamma(1-self.gamma[k]+self.alpha[k])/gamma(self.alpha[k])) * ((1-self.gamma[k])/self.alpha[k] + 1)*T**(self.gamma[k]-1) * (self.bs.t_eval_vals_ord/T)**self.alpha[k]
+                    # delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])
+
+                    # NEW:
+                    prefix = (1/gamma(self.alpha[k])) * ((1-self.gamma[k])/self.alpha[k] + 1) * (self.bs.t_eval_vals_ord)**self.alpha[k]
+                    delta[k] = gamma(1-self.gamma[k]+self.alpha[k])*self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])/(T**(1-self.gamma[k]+self.alpha[k]))
+
                     # else:
                     #     prefix = (self.bs.t_eval_vals_ord/T)**self.alpha[k]
                     #     delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
