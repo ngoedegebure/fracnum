@@ -175,7 +175,12 @@ class BernsteinSplines:
             mult_shape = 2
             n = "plusone" # A bit ugly now but it works for storage
         else:
-            mult_shape = A.shape[1]*(n-1)-1
+            # TODO: CHECK!!!
+            q_in = A.shape[1]-1
+            q_out = n*q_in
+            mult_shape = q_out - q_in + 1
+            # breakpoint()
+            # mult_shape = A.shape[1]*(n-1)-1
 
         index_tuple = (A.shape, n)
         # Get or create scaling matrix
@@ -210,7 +215,7 @@ class BernsteinSplines:
                 if alpha_val not in self.B_I.keys():
                     self.B_I[alpha_val] = SplineMethods.build_integral_basis(alpha_val, self.t_calc_vals_ord, self.t_eval_vals_ord, progress_verbose=verbose, time_verbose=time_verbose)
     
-    def initialize_solver(self, f, x_0, alpha_vals, beta_vals = 1,forcing_params = {}):
-        return SplineSolver(self, f, x_0, alpha_vals, beta_vals = beta_vals, forcing_parameters = forcing_params)
+    def initialize_solver(self, f, x_0, alpha_vals, beta_vals = 1,forcing_params = {}, f_t_vals_eval_res = False):
+        return SplineSolver(self, f, x_0, alpha_vals, beta_vals = beta_vals, forcing_parameters = forcing_params, f_t_vals_eval_res = f_t_vals_eval_res)
         
     

@@ -127,8 +127,11 @@ class SplineSolver():
             # x_flat = np.ones([N_tot, self.d]) * self.x_0
             # x = np.array([SplineMethods.a_to_matrix(x_flat[:, i], self.bs.n_eval) for i in range(self.d)])
             # OR:
-            x_flat = self.bs.t_eval_vals_list/self.bs.t_eval_vals_list[-1]
-            x = np.array([SplineMethods.a_to_matrix(self.x_0[i]+x_flat, self.bs.n_eval) for i in range(self.d)])
+            # x_flat = self.bs.t_eval_vals_list/self.bs.t_eval_vals_list[-1]
+            # x = np.array([SplineMethods.a_to_matrix(self.x_0[i]+x_flat, self.bs.n_eval) for i in range(self.d)])
+            # OR:
+            t_flat = np.array([self.bs.t_eval_vals_list**(g-1) for g in self.gamma]) #self.bs.t_eval_vals_list**(self.gamma-1)
+            x = np.array([SplineMethods.a_to_matrix(self.x_0[i]/gamma(self.gamma[i])*t_flat[i], self.bs.n_eval) for i in range(self.d)])
 
         return x
 
@@ -193,7 +196,8 @@ class SplineSolver():
             # OLD:
             # delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
             # NEW:
-            delta[k] = - gamma(1-self.gamma[k]+self.alpha[k])*self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])/(T**(1-self.gamma[k]+self.alpha[k]))
+            zeta = 1-self.gamma[k]+self.alpha[k]
+            delta[k] = - gamma(zeta+1)*T**(-zeta)*self.bs.I_a_scalar(T, f_a_vals[k, :, :], zeta)
         return delta
     
     @staticmethod
@@ -294,7 +298,7 @@ class SplineSolver():
         #         x[k, :, :] = x[k, :, :] * self.bs.t_eval_vals_ord**(self.gamma[k]-1)
         return x, f_a_vals_tot, n_tot_it, it_norm
     
-    def iterate_global(self, x, conv_tol, conv_max_it, div_treshold, norm, verbose, bvp = None, T = None):
+    def iterate_global(self, x, conv_tol, conv_max_it, div_treshold, norm, verbose, bvp = None, T = None, new_hilf = True):
         # If bvp, keep track of the delta ( _0I^alpha_T f(x) )
         if bvp:
             delta = np.zeros(self.d)
@@ -305,19 +309,30 @@ class SplineSolver():
 
         for n_tot_it in range(conv_max_it):
             x_prev = x.copy() # Store previous estimate for increment norm calculation later
-            f_a_vals[:, :, :] = self.f(self.f_t_vals, x) # Calculate f(x, t)
 
             for k in range(self.d):
                 # Get _0I^alpha_t f(x,t) for all t_eval
-                int_vals = self.bs.I_a(f_a_vals[k, :, :], alpha = self.alpha[k])
+                
                 # x = x_0 + _0I_t^alpha f(x,t)
 
                 if self.hilfer:
-                    ic_part = self.hilfer_vals[k]
-                else:
-                    ic_part = self.x_0[k] 
+                    if new_hilf: # NEW:
+                        f_a_vals[:, :, :] = self.f(self.f_t_vals[:, :], x[:, :, :] * self.bs.t_eval_vals_ord**(self.gamma[k]-1))
 
-                x[k, :, :] = ic_part + int_vals
+                        ic_part = self.x_0[k]/gamma(self.gamma[k])
+                        int_vals = self.bs.t_eval_vals_ord[:, :]**(1-self.gamma[k]) * self.bs.I_a(f_a_vals[k, :, :], alpha = self.alpha[k])
+
+                        x[k, :, :] = ic_part + int_vals
+                    else:
+                        f_a_vals[:, :, :] = self.f(self.f_t_vals, x) # Calculate f(x, t)
+                        ic_part = self.hilfer_vals[k]
+                        int_vals = self.bs.I_a(f_a_vals[k, :, :], alpha = self.alpha[k])
+                        x[k, :, :] = ic_part + int_vals
+                else:
+                    f_a_vals[:, :, :] = self.f(self.f_t_vals, x) # Calculate f(x, t)
+                    ic_part = self.x_0[k]
+                    int_vals = self.bs.I_a(f_a_vals[k, :, :], alpha = self.alpha[k])
+                    x[k, :, :] = ic_part + int_vals
 
                 if np.array(self.forcing_vals[k]).size > 1:
                     if bvp:
@@ -337,14 +352,22 @@ class SplineSolver():
                     # delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])
 
                     # NEW:
-                    prefix = (1/gamma(self.alpha[k])) * ((1-self.gamma[k])/self.alpha[k] + 1) * (self.bs.t_eval_vals_ord)**self.alpha[k]
-                    delta[k] = gamma(1-self.gamma[k]+self.alpha[k])*self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])/(T**(1-self.gamma[k]+self.alpha[k]))
+                    # prefix = (1/gamma(self.alpha[k])) * ((1-self.gamma[k])/self.alpha[k] + 1) * (self.bs.t_eval_vals_ord)**self.alpha[k]
+                    # delta[k] = gamma(1-self.gamma[k]+self.alpha[k])*self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k]+1-self.gamma[k])/(T**(1-self.gamma[k]+self.alpha[k]))
+
+                    zeta = 1-self.gamma[k]+self.alpha[k]
+                    
+                    prefix = self.bs.t_eval_vals_ord ** self.alpha[k] / gamma(self.alpha[k]+1)
+                    delta[k] = gamma(zeta+1)/T**zeta * self.bs.I_a_scalar(T, f_a_vals[k, :, :], zeta)
 
                     # else:
                     #     prefix = (self.bs.t_eval_vals_ord/T)**self.alpha[k]
                     #     delta[k] = self.bs.I_a_scalar(T, f_a_vals[k, :, :], self.alpha[k])
                     # Substract integrated delta for BVP requirement
-                    x[k, :, :] -= prefix* delta[k]
+                    if new_hilf:
+                        x[k, :, :] -= prefix* delta[k] * self.bs.t_eval_vals_ord[:, :]**(1-self.gamma[k])
+                    else:
+                        x[k, :, :] -= prefix* delta[k]
 
             # Compute the iteration norm increment
             it_norm = SplineSolver.it_norm(x, x_prev, norm)
